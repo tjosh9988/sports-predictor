@@ -5,11 +5,13 @@ Configures global middleware, authentication, routes, and provides
 lifespan management for background tasks and schedulers.
 """
 
+import os
 import logging
 import time
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
+import uvicorn
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -59,12 +61,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 async def verify_supabase_token(token: str):
     """
     Verifies the Supabase JWT token.
-    In reality, we use supabase-py or a JWT library to decode and check the 'sub' claim.
     """
     supabase = get_supabase_admin()
     try:
-        # Simplification: call supabase.auth.get_user(token)
-        # This confirms the token is valid with the Supabase auth server.
         user = supabase.auth.get_user(token)
         return user
     except Exception:
@@ -81,19 +80,21 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     logger.info("🚀 Starting %s [%s]", settings.APP_NAME, settings.ENVIRONMENT)
     
-    # 1. Health Checks
-    if not check_supabase_health():
-        logger.warning("⚠️  Supabase health check failed on startup.")
-    if not check_redis_health():
-        logger.warning("⚠️  Redis health check failed on startup.")
+    # 1. Health Checks (Wrapped in try/except)
+    try:
+        if not check_supabase_health():
+            logger.warning("⚠️  Supabase health check failed on startup.")
+    except Exception as e:
+        logger.error(f"❌ Supabase connection failed: {e}")
+
+    try:
+        if not check_redis_health():
+            logger.warning("⚠️  Redis health check failed on startup.")
+    except Exception as e:
+        logger.error(f"❌ Redis connection failed: {e}")
 
     # 2. Initialize Schedulers
-    # In a real microservice, these might run as separate worker processes.
-    # Here we simulate starting the specialized background jobs.
     logger.info("⏰ Initializing Weekly Trainer and Daily Accumulator jobs...")
-    # from app.ml.training_pipeline import start_scheduler
-    # from app.ml.accumulator_builder import run_accumulator_job
-    # asyncio.create_task(run_scheduler_in_background())
     
     yield
     logger.info("🛑 Shutting down %s", settings.APP_NAME)
@@ -106,6 +107,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# ─────────────────────────── Core Routes (EARLY) ───────────────────────────
+
+@app.get("/health", tags=["System"])
+async def health():
+    """Simple health check with zero dependencies."""
+    return {"status": "ok"}
+
+# ─────────────────────────── Middleware & Config ───────────────────────────
 
 # CORS
 app.add_middleware(
@@ -125,7 +135,7 @@ app.include_router(results_router)
 app.include_router(sports_router)
 app.include_router(users_router)
 
-# ─────────────────────────── Core Routes ───────────────────────────────────
+# ─────────────────────────── Other Routes ──────────────────────────────────
 
 @app.get("/", tags=["System"])
 async def root():
@@ -133,16 +143,6 @@ async def root():
         "app": settings.APP_NAME,
         "status": "online",
         "documentation": "/docs"
-    }
-
-@app.get("/health", tags=["System"])
-async def health():
-    """Full health check — confirms Supabase and Redis connectivity."""
-    s_ok = check_supabase_health()
-    r_ok = check_redis_health()
-    return {
-        "status": "healthy" if (s_ok and r_ok) else "degraded",
-        "services": {"supabase": s_ok, "redis": r_ok}
     }
 
 # ─────────────────────────── WebSockets ────────────────────────────────────
@@ -172,9 +172,13 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # Wait for any incoming messages (or just keep connection open)
             data = await websocket.receive_text()
-            # Echo or handle incoming client signal
             await websocket.send_text(f"Signal received: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+# ─────────────────────────── Main ──────────────────────────────────────────
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)

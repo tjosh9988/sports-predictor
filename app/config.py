@@ -23,24 +23,24 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # ── Supabase ────────────────────────────────────────────────
-    SUPABASE_URL: str = Field(..., description="https://<project>.supabase.co")
-    SUPABASE_ANON_KEY: str = Field(..., description="Public anon key (safe for frontend)")
-    SUPABASE_SERVICE_ROLE_KEY: str = Field(..., description="Secret — never expose to clients")
+    SUPABASE_URL: str = Field(default="", description="https://<project>.supabase.co")
+    SUPABASE_ANON_KEY: str = Field(default="", description="Public anon key (safe for frontend)")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", description="Secret — never expose to clients")
 
     # ── Upstash Redis ────────────────────────────────────────────
-    UPSTASH_REDIS_REST_URL: str = Field(..., description="https://<name>.upstash.io")
-    UPSTASH_REDIS_REST_TOKEN: str = Field(..., description="Upstash REST auth token")
+    UPSTASH_REDIS_REST_URL: str = Field(default="", description="https://<name>.upstash.io")
+    UPSTASH_REDIS_REST_TOKEN: str = Field(default="", description="Upstash REST auth token")
 
     # ── Sports Data APIs ─────────────────────────────────────────
-    API_SPORTS_KEY: str = Field(..., description="api-sports.io key")
+    API_SPORTS_KEY: str = Field(default="", description="api-sports.io key")
     ODDS_API_KEY: str = Field(default="", alias="ODDSPAPI_KEY", description="OddsAPI / OddsPortal key")
-    THE_ODDS_API_KEY: str = Field(..., description="the-odds-api.com key")
+    THE_ODDS_API_KEY: str = Field(default="", description="the-odds-api.com key")
 
     # ── News & Sentiment ─────────────────────────────────────────
-    NEWSAPI_KEY: str = Field(..., description="newsapi.org key")
+    NEWSAPI_KEY: str = Field(default="", description="newsapi.org key")
 
     # ── AI / LLM ─────────────────────────────────────────────────
-    ANTHROPIC_API_KEY: str = Field(..., description="Anthropic Claude API key")
+    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic Claude API key")
 
     # ── Derived helpers ──────────────────────────────────────────
     @property
