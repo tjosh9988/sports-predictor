@@ -1,6 +1,4 @@
-import asyncio
-import os
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from app.database import get_supabase_admin
 
 supabase = get_supabase_admin()
@@ -34,70 +32,74 @@ async def import_status():
     }
 
 @router.get("/import/{sport}")
-async def trigger_import(sport: str):
+async def trigger_import(
+    sport: str, 
+    background_tasks: BackgroundTasks
+):
     try:
         if sport == "all":
             from app.ingestion.run_importers import (
                 run_all_importers
             )
-            asyncio.create_task(run_all_importers())
+            background_tasks.add_task(run_all_importers)
             return {
                 "status": "started",
-                "message": "All importers running in background"
+                "message": "All importers running"
             }
         else:
             from app.ingestion.run_importers import (
                 run_single_importer
             )
-            asyncio.create_task(
-                run_single_importer(sport)
+            background_tasks.add_task(
+                run_single_importer, sport
             )
             return {
                 "status": "started",
                 "sport": sport,
-                "message": f"Importing {sport} in background"
+                "message": f"Importing {sport}"
             }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @router.get("/fetch-fixtures")
-async def fetch_fixtures():
+async def fetch_fixtures(
+    background_tasks: BackgroundTasks
+):
     try:
         from app.ingestion.fixture_fetcher import (
             fetch_all_fixtures
         )
-        asyncio.create_task(fetch_all_fixtures())
+        background_tasks.add_task(fetch_all_fixtures)
         return {
             "status": "started",
-            "message": "Fetching live fixtures in background"
+            "message": "Fetching fixtures in background"
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @router.get("/train/{sport}")
-async def trigger_training(sport: str):
+async def trigger_training(
+    sport: str,
+    background_tasks: BackgroundTasks
+):
     try:
         if sport == "all":
             from app.ml.training_pipeline import (
                 train_all_models
             )
-            asyncio.create_task(train_all_models())
-            return {
-                "status": "started",
-                "message": "Training all models in background"
-            }
+            background_tasks.add_task(train_all_models)
         else:
             from app.ml.training_pipeline import (
                 train_sport_models
             )
-            asyncio.create_task(
-                train_sport_models(sport)
+            background_tasks.add_task(
+                train_sport_models, sport
             )
-            return {
-                "status": "started",
-                "sport": sport,
-                "message": f"Training {sport} models"
-            }
+        return {
+            "status": "started",
+            "sport": sport,
+            "message": f"Training {sport} models"
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
