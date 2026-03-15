@@ -62,8 +62,28 @@ NFL_ALIASES: dict[str, str] = {
 
 
 class NFLImporter(BaseImporter):
-
     sport_slug = "nfl"
+
+    async def download_from_storage(self):
+        """Downloads all files for nfl from Supabase Storage"""
+        import os
+        folder = "nfl"
+        files = self.client.storage.from_("sports-data").list(folder)
+        
+        local_dir = f"/tmp/stats/{folder}"
+        os.makedirs(local_dir, exist_ok=True)
+        
+        for file in files:
+            file_path = f"{folder}/{file['name']}"
+            data = self.client.storage.from_("sports-data").download(file_path)
+            
+            local_file = f"{local_dir}/{file['name']}"
+            with open(local_file, "wb") as f:
+                f.write(data)
+            logger.info("Downloaded %s", file_path)
+        
+        self.data_dir = Path(local_dir)
+        return local_dir
 
     def load_aliases(self) -> dict[str, str]:
         return NFL_ALIASES

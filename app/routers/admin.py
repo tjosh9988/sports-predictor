@@ -1,7 +1,9 @@
 import asyncio
 import os
 from fastapi import APIRouter
-from app.database import supabase
+from app.database import get_supabase_admin
+
+supabase = get_supabase_admin()
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 

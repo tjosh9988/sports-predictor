@@ -56,6 +56,27 @@ class TennisImporter(BaseImporter):
 
     sport_slug = "tennis"
 
+    async def download_from_storage(self):
+        """Downloads all files for this tennis tour from Supabase Storage"""
+        import os
+        folder = f"tennis_{self.tour}"
+        files = self.client.storage.from_("sports-data").list(folder)
+        
+        local_dir = f"/tmp/stats/{folder}"
+        os.makedirs(local_dir, exist_ok=True)
+        
+        for file in files:
+            file_path = f"{folder}/{file['name']}"
+            data = self.client.storage.from_("sports-data").download(file_path)
+            
+            local_file = f"{local_dir}/{file['name']}"
+            with open(local_file, "wb") as f:
+                f.write(data)
+            logger.info("Downloaded %s", file_path)
+        
+        self.data_dir = Path(local_dir)
+        return local_dir
+
     def __init__(self, data_dir, supabase_admin, tour: str = "atp"):
         self.tour = tour.lower()
         super().__init__(data_dir, supabase_admin)

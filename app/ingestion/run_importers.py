@@ -104,13 +104,13 @@ def _build_importer_factory(
     client,
 ) -> Callable | None:
     """Returns a callable that creates and runs the correct importer, or None if dir missing."""
-    from app.football_importer import FootballImporter
-    from app.tennis_importer   import TennisImporter
-    from app.nba_importer      import NBAImporter
-    from app.nfl_importer      import NFLImporter
-    from app.cricket_importer  import CricketImporter
-    from app.nhl_importer      import NHLImporter
-    from app.mlb_importer      import MLBImporter
+    from app.ingestion.football_importer import FootballImporter
+    from app.ingestion.tennis_importer   import TennisImporter
+    from app.ingestion.nba_importer      import NBAImporter
+    from app.ingestion.nfl_importer      import NFLImporter
+    from app.ingestion.cricket_importer  import CricketImporter
+    from app.ingestion.nhl_importer      import NHLImporter
+    from app.ingestion.mlb_importer      import MLBImporter
 
     sport_dir_map = {
         "football":   stats_root / "football",
@@ -412,6 +412,48 @@ def main() -> int:
 
     logger.info(_c("🏆 All imports completed successfully!", GREEN))
     return 0
+
+
+# ─────────────────────────── Async Admin Functions ─────────────────────────
+
+async def run_single_importer(sport: str):
+    """
+    Asynchronous orchestrator for a single sport.
+    Used by the FastAPI admin endpoint.
+    """
+    from app.database import get_supabase_admin
+    client = get_supabase_admin()
+    stats_root = Path("/tmp/stats")
+    
+    # 1. Build factory to get the importer class
+    factory_info = _build_importer_factory(sport, stats_root, client)
+    if not factory_info:
+        logger.error(f"No importer found for sport: {sport}")
+        return
+
+    factory_fn, _ = factory_info
+    importer = factory_fn()
+
+    # 2. Trigger download from storage
+    if hasattr(importer, "download_from_storage"):
+        logger.info(f"Downloading data from Supabase Storage for {sport}...")
+        await importer.download_from_storage()
+    
+    # 3. Run the importer
+    logger.info(f"Starting ingestion for {sport}...")
+    # Wrap in try block to ensure we don't crash the background task thread
+    try:
+        importer.run()
+    except Exception as e:
+        logger.error(f"Ingestion failed for {sport}: {e}", exc_info=True)
+
+
+async def run_all_importers():
+    """
+    Asynchronous orchestrator for all sports.
+    """
+    for sport in SPORT_ORDER:
+        await run_single_importer(sport)
 
 
 if __name__ == "__main__":
