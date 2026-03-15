@@ -59,64 +59,132 @@ async def get_sport_leagues(sport: str):
         raise HTTPException(status_code=500, detail="Failed to fetch leagues.")
 
 @router.get("/{sport}/fixtures")
-async def get_sport_fixtures(sport: str, date: Optional[str] = None):
-    """
-    Fetch upcoming fixtures for a specific sport, optionally filtered by date.
-    Returns mock data if the database is empty.
-    """
-    supabase = get_supabase_admin()
+async def get_sport_fixtures(sport: str, date: str = None):
     try:
-        sport_res = supabase.table("sports").select("id").eq("slug", sport).single().execute()
-        if not sport_res.data:
-            raise HTTPException(status_code=404, detail="Sport not found.")
+        from app.database import get_supabase_admin
+        supabase = get_supabase_admin()
         
-        sport_id = sport_res.data["id"]
-        query = supabase.table("matches").select("*").eq("sport_id", sport_id)
+        # Handle "all" — query all sports
+        if sport == "all":
+            query = supabase.table("matches")\
+                .select("*")\
+                .eq("status", "upcoming")\
+                .order("match_date")
+        else:
+            # Query for specific sport
+            # Note: The database uses sport_id (int). 
+            # We need to map the slug to the ID first unless the table has a 'sport' slug column.
+            # Based on previous implementation, we fetch sport_id.
+            sport_res = supabase.table("sports").select("id").eq("slug", sport).single().execute()
+            if not sport_res.data:
+                # If sport not found, return sample for that sport
+                return {
+                    "data": get_sample_fixtures(sport),
+                    "count": 4,
+                    "source": "sample",
+                    "info": f"Sport '{sport}' not found in database"
+                }
+            
+            sport_id = sport_res.data["id"]
+            query = supabase.table("matches")\
+                .select("*")\
+                .eq("sport_id", sport_id)\
+                .eq("status", "upcoming")\
+                .order("match_date")
         
         if date:
-            start_date = f"{date}T00:00:00Z"
-            end_date = f"{date}T23:59:59Z"
-            query = query.gte("match_date", start_date).lte("match_date", end_date)
-        else:
-            now = datetime.now(timezone.utc).isoformat()
-            query = query.eq("status", "upcoming").gte("match_date", now)
-            
-        res = query.order("match_date", desc=False).execute()
+            # Flexible date handling
+            query = query.gte("match_date", f"{date}T00:00:00Z")\
+                         .lte("match_date", f"{date}T23:59:59Z")
         
-        if res.data:
-            return {"data": res.data, "count": len(res.data), "source": "database"}
-            
-        # Mock/Sample data if empty
+        result = query.limit(50).execute()
+        fixtures = result.data if result.data else []
+        
+        # Return sample data if database is empty
+        if not fixtures:
+            return {
+                "data": get_sample_fixtures(sport),
+                "count": 4,
+                "source": "sample"
+            }
+        
+        return {"data": fixtures, "count": len(fixtures), "source": "database"}
+        
+    except Exception as e:
+        logger.error(f"Fixtures error: {e}")
         return {
-            "data": [
-                {
-                    "id": 10001,
-                    "sport_id": sport_id,
-                    "league_id": 1,
-                    "home_team_id": 1,
-                    "away_team_id": 2,
-                    "match_date": "2026-03-15T15:00:00Z",
-                    "status": "upcoming",
-                    "venue": "Emirates Stadium",
-                    "round": "Matchday 28"
-                },
-                {
-                    "id": 10002, 
-                    "sport_id": sport_id,
-                    "league_id": 2,
-                    "home_team_id": 3,
-                    "away_team_id": 4,
-                    "match_date": "2026-03-15T20:00:00Z",
-                    "status": "upcoming",
-                    "venue": "Santiago Bernabeu",
-                    "round": "Matchday 28"
-                }
-            ],
-            "count": 2,
-            "source": "sample"
+            "data": get_sample_fixtures(sport),
+            "count": 4,
+            "source": "sample",
+            "error": str(e)
         }
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Error fetching fixtures for %s: %s", sport, exc)
-        return {"data": [], "count": 0, "error": str(exc)}
+
+def get_sample_fixtures(sport: str):
+    """
+    Returns a list of high-quality sample fixtures.
+    """
+    all_samples = [
+        {
+            "id": 1001,
+            "sport": "football",
+            "league": "Premier League",
+            "home_team": "Arsenal",
+            "away_team": "Chelsea",
+            "match_date": "2026-03-16T15:00:00Z",
+            "status": "upcoming",
+            "home_odds": 2.10,
+            "draw_odds": 3.40,
+            "away_odds": 3.20,
+            "venue": "Emirates Stadium",
+            "round": "Matchday 28"
+        },
+        {
+            "id": 1002,
+            "sport": "football",
+            "league": "La Liga",
+            "home_team": "Real Madrid",
+            "away_team": "Barcelona",
+            "match_date": "2026-03-16T20:00:00Z",
+            "status": "upcoming",
+            "home_odds": 2.30,
+            "draw_odds": 3.20,
+            "away_odds": 2.90,
+            "venue": "Santiago Bernabeu",
+            "round": "Matchday 28"
+        },
+        {
+            "id": 1003,
+            "sport": "basketball",
+            "league": "NBA",
+            "home_team": "LA Lakers",
+            "away_team": "Boston Celtics",
+            "match_date": "2026-03-16T23:00:00Z",
+            "status": "upcoming",
+            "home_odds": 1.95,
+            "draw_odds": None,
+            "away_odds": 1.85,
+            "venue": "Crypto.com Arena",
+            "round": "Regular Season"
+        },
+        {
+            "id": 1004,
+            "sport": "tennis",
+            "league": "ATP Miami Open",
+            "home_team": "Novak Djokovic",
+            "away_team": "Carlos Alcaraz",
+            "match_date": "2026-03-16T18:00:00Z",
+            "status": "upcoming",
+            "home_odds": 2.10,
+            "draw_odds": None,
+            "away_odds": 1.70,
+            "venue": "Hard Rock Stadium",
+            "round": "Quarter Final"
+        }
+    ]
+    
+    if sport == "all":
+        return all_samples
+    
+    # Filter by sport slug if specific sport requested
+    filtered = [s for s in all_samples if s["sport"] == sport]
+    return filtered if filtered else all_samples
