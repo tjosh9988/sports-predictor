@@ -24,6 +24,7 @@ Output
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
 import sys
@@ -416,6 +417,25 @@ def main() -> int:
 
 # ─────────────────────────── Async Admin Functions ─────────────────────────
 
+async def run_all_importers():
+    """
+    Asynchronous orchestrator for all sports.
+    """
+    for sport in SPORT_ORDER:
+        await run_single_importer(sport)
+
+
+async def keep_alive_logger(sport: str):
+    """Prints a keep-alive message every 30 seconds."""
+    count = 0
+    while True:
+        try:
+            await asyncio.sleep(30)
+            count += 30
+            print(f"Import still running: {sport} — {count}s elapsed")
+        except asyncio.CancelledError:
+            break
+
 async def run_single_importer(sport: str):
     """
     Asynchronous orchestrator for a single sport.
@@ -439,21 +459,24 @@ async def run_single_importer(sport: str):
         logger.info(f"Downloading data from Supabase Storage for {sport}...")
         await importer.download_from_storage()
     
-    # 3. Run the importer
+    # 3. Run the importer with keep-alive ping
     logger.info(f"Starting ingestion for {sport}...")
-    # Wrap in try block to ensure we don't crash the background task thread
+    
+    # Start the keep-alive logger as a background task
+    keep_alive_task = asyncio.create_task(keep_alive_logger(sport))
+    
     try:
-        importer.run()
+        # Use to_thread to keep the event loop free for the logger
+        await asyncio.to_thread(importer.run)
     except Exception as e:
         logger.error(f"Ingestion failed for {sport}: {e}", exc_info=True)
-
-
-async def run_all_importers():
-    """
-    Asynchronous orchestrator for all sports.
-    """
-    for sport in SPORT_ORDER:
-        await run_single_importer(sport)
+    finally:
+        # Ensure we cancel the logger when ingestion finishes
+        keep_alive_task.cancel()
+        try:
+            await keep_alive_task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":
