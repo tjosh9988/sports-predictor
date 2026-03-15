@@ -1,0 +1,5 @@
+soccerdata==1.8.8
+pandas>=2.0.0
+requests==2.32.3
+supabase==2.10.0
+python-dotenv==1.0.1
