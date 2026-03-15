@@ -15,6 +15,7 @@ Rate limits handled with exponential-backoff retry via tenacity.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -457,3 +458,138 @@ def _scheduled_job() -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     run_scheduler()
+
+
+# ─────────────────────────── Simplified Fetcher for Admin API ────────────────
+
+API_SPORTS_KEY = os.getenv("API_SPORTS_KEY", "")
+
+SPORT_CONFIGS_SIMPLE = {
+    "football": {
+        "url": "https://v3.football.api-sports.io/fixtures",
+        "params": {"next": 50}
+    },
+    "basketball": {
+        "url": "https://v1.basketball.api-sports.io/games",
+        "params": {"next": 50}
+    },
+    "nfl": {
+        "url": "https://v1.american-football.api-sports.io/games",
+        "params": {"next": 50}
+    },
+    "baseball": {
+        "url": "https://v2.baseball.api-sports.io/games",
+        "params": {"next": 50}
+    },
+    "hockey": {
+        "url": "https://v1.hockey.api-sports.io/games",
+        "params": {"next": 50}
+    }
+}
+
+async def fetch_sport_fixtures(sport: str, config: dict):
+    """Fetch fixtures for a single sport from API-Sports"""
+    headers = {
+        "x-apisports-key": API_SPORTS_KEY
+    }
+    
+    fixtures_inserted = 0
+    
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                config["url"],
+                headers=headers,
+                params=config["params"]
+            )
+            
+            if response.status_code != 200:
+                print(f"API error for {sport}: {response.status_code}")
+                return 0
+            
+            data = response.json()
+            fixtures = data.get("response", [])
+            
+            print(f"Fetched {len(fixtures)} {sport} fixtures")
+            
+            supabase = get_supabase_admin()
+            
+            for fixture in fixtures:
+                try:
+                    # Normalize fixture data per sport
+                    match_data = normalize_fixture(
+                        sport, fixture
+                    )
+                    if match_data:
+                        supabase.table("matches")\
+                            .upsert(match_data)\
+                            .execute()
+                        fixtures_inserted += 1
+                except Exception as e:
+                    print(f"Error inserting fixture: {e}")
+                    continue
+            
+            print(f"Inserted {fixtures_inserted} {sport} fixtures")
+            return fixtures_inserted
+            
+    except Exception as e:
+        print(f"Error fetching {sport} fixtures: {e}")
+        return 0
+
+def normalize_fixture(sport: str, fixture: dict) -> dict:
+    """Normalize fixture data to match schema"""
+    try:
+        if sport == "football":
+            f = fixture.get("fixture", {})
+            teams = fixture.get("teams", {})
+            goals = fixture.get("goals", {})
+            
+            return {
+                "sport": "football",
+                "league": fixture.get("league", {})
+                                  .get("name", "Unknown"),
+                "home_team": teams.get("home", {})
+                                   .get("name", "Unknown"),
+                "away_team": teams.get("away", {})
+                                   .get("name", "Unknown"),
+                "match_date": f.get("date"),
+                "status": "upcoming",
+                "venue": f.get("venue", {})
+                          .get("name", "Unknown"),
+                "home_score": goals.get("home"),
+                "away_score": goals.get("away"),
+            }
+        else:
+            # Generic handler for other sports
+            teams = fixture.get("teams", {})
+            return {
+                "sport": sport,
+                "league": fixture.get("league", {})
+                                  .get("name", "Unknown"),
+                "home_team": teams.get("home", {})
+                                   .get("name", "Unknown"),
+                "away_team": teams.get("away", {})
+                                   .get("name", "Unknown"),
+                "match_date": fixture.get("date"),
+                "status": "upcoming",
+            }
+    except Exception as e:
+        print(f"Normalize error: {e}")
+        return None
+
+async def fetch_all_fixtures():
+    """Main function — fetches fixtures for all sports"""
+    print("Starting fixture fetch for all sports...")
+    total = 0
+    
+    for sport, config in SPORT_CONFIGS_SIMPLE.items():
+        try:
+            print(f"Fetching {sport} fixtures...")
+            count = await fetch_sport_fixtures(sport, config)
+            total += count
+        except Exception as e:
+            print(f"Error fetching {sport}: {e}")
+            continue
+    
+    print(f"Total fixtures fetched: {total}")
+    return total
