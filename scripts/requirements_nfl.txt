@@ -1,5 +1,0 @@
-nfl-data-py==0.3.3
-pandas>=1.0,<2.0
-requests==2.32.3
-supabase==2.10.0
-python-dotenv==1.0.1
