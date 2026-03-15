@@ -1,3 +1,21 @@
+# REQUIREMENTS:
+# Python version must be 3.9, 3.10, 3.11 or 3.12
+# Python 3.13+ is NOT supported by soccerdata
+# 
+# If you have Python 3.13+, create a virtual env:
+# 
+# Windows:
+#   py -3.11 -m venv sports_env
+#   sports_env\Scripts\activate
+#   pip install -r scripts/requirements_downloader.txt
+#   python scripts/download_all_sports_data.py
+#
+# Mac/Linux:
+#   python3.11 -m venv sports_env
+#   source sports_env/bin/activate
+#   pip install -r scripts/requirements_downloader.txt
+#   python scripts/download_all_sports_data.py
+
 import os
 import time
 import requests

@@ -1,4 +1,7 @@
-soccerdata==0.4.5
+# Use latest compatible soccerdata
+soccerdata==1.8.8
+
+# Fix all other versions
 nba_api==1.4.1
 nfl-data-py==0.3.3
 pybaseball==2.2.7
