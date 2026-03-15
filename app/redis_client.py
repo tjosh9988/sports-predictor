@@ -162,3 +162,9 @@ def check_redis_health() -> bool:
     except Exception as exc:
         logger.error("Redis health check failed: %s", exc)
         return False
+
+async def init_redis():
+    """Initializes the Redis client."""
+    get_redis()
+    if not check_redis_health():
+        logger.warning("Redis health check failed during init_redis.")

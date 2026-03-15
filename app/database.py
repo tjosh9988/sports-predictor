@@ -141,4 +141,10 @@ def check_supabase_health() -> bool:
         return True
     except Exception as exc:
         logger.error("Supabase health check failed: %s", exc)
-        return False
+async def init_db():
+    """Initializes the database connection/engine."""
+    _get_engine()
+    _get_session_local()
+    # Simple check to ensure connectivity
+    if not check_supabase_health():
+        logger.warning("Supabase health check failed during init_db.")
