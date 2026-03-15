@@ -58,10 +58,9 @@ async def get_sport_leagues(sport: str):
         raise HTTPException(status_code=500, detail="Failed to fetch leagues.")
 
 @router.get("/{sport}/fixtures", response_model=List[MatchOut])
-async def get_sport_fixtures(sport: str):
+async def get_sport_fixtures(sport: str, date: Optional[str] = None):
     """
-    Fetch upcoming fixtures for a specific sport.
-    (Aliased to predictions/fixtures for convenience)
+    Fetch upcoming fixtures for a specific sport, optionally filtered by date.
     """
     supabase = get_supabase_admin()
     try:
@@ -70,17 +69,18 @@ async def get_sport_fixtures(sport: str):
             raise HTTPException(status_code=404, detail="Sport not found.")
         
         sport_id = sport_res.data["id"]
-        now = datetime.now(timezone.utc).isoformat()
+        query = supabase.table("matches").select("*").eq("sport_id", sport_id)
         
-        res = (
-            supabase.table("matches")
-            .select("*")
-            .eq("sport_id", sport_id)
-            .eq("status", "upcoming")
-            .gte("match_date", now)
-            .order("match_date", desc=False)
-            .execute()
-        )
+        if date:
+            # Filter for the specific date (00:00:00 to 23:59:59)
+            start_date = f"{date}T00:00:00Z"
+            end_date = f"{date}T23:59:59Z"
+            query = query.gte("match_date", start_date).lte("match_date", end_date)
+        else:
+            now = datetime.now(timezone.utc).isoformat()
+            query = query.eq("status", "upcoming").gte("match_date", now)
+            
+        res = query.order("match_date", desc=False).execute()
         return res.data or []
     except HTTPException:
         raise
