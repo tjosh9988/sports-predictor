@@ -33,10 +33,10 @@ async def startup():
     except Exception as e:
         print(f"Redis connection failed: {e}")
 
-app.include_router(predictions.router, prefix="/predictions")
-app.include_router(results.router, prefix="/results")
-app.include_router(sports.router, prefix="/sports")
-app.include_router(users.router, prefix="/users")
+app.include_router(predictions.router)
+app.include_router(results.router)
+app.include_router(sports.router)
+app.include_router(users.router)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
