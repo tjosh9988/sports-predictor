@@ -1,5 +1,7 @@
 import os
 import uvicorn
+import asyncio
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import predictions, results, sports, users, admin
@@ -33,6 +35,29 @@ async def startup():
         print("Redis connected")
     except Exception as e:
         print(f"Redis connection failed: {e}")
+    
+    # Start Keep-Alive task
+    asyncio.create_task(keep_alive_ping())
+
+async def keep_alive_ping():
+    """Ping self every 10 minutes to prevent sleep"""
+    await asyncio.sleep(60)  # Wait 1 min after startup
+    while True:
+        try:
+            base_url = os.getenv(
+                "RENDER_EXTERNAL_URL",
+                "https://sports-predictor-1-o34s.onrender.com"
+            )
+            async with httpx.AsyncClient() as client:
+                await client.get(
+                    f"{base_url}/health",
+                    timeout=10
+                )
+            print("Keep-alive ping sent")
+        except Exception as e:
+            print(f"Keep-alive failed: {e}")
+        
+        await asyncio.sleep(600)  # Ping every 10 minutes
 
 app.include_router(predictions.router)
 app.include_router(results.router)
