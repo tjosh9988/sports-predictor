@@ -19,7 +19,7 @@ from typing import Any
 from upstash_redis import Redis as UpstashRedis
 import redis as redis_py
 
-from .config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

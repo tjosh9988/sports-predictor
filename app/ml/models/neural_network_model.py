@@ -33,7 +33,7 @@ import torch.nn.functional as F
 from sklearn.metrics import log_loss
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from .base_model import (
+from app.base_model import (
     BetHeroBaseModel,
     CalibrationMethod,
     PredictionBatch,

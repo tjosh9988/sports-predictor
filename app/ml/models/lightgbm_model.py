@@ -24,7 +24,7 @@ from lightgbm import LGBMClassifier, early_stopping, log_evaluation
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import log_loss
 
-from .base_model import (
+from app.base_model import (
     BetHeroBaseModel,
     CalibrationMethod,
     PredictionBatch,

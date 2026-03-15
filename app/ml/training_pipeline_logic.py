@@ -16,11 +16,11 @@ import mlflow.sklearn
 import numpy as np
 import pandas as pd
 
-from ..config import settings
-from ..database import get_supabase_admin
-from .feature_engineer import FeatureEngineer
-from .feature_validator import validate_before_training
-from .models import (
+from app.config import settings
+from app.database import get_supabase_admin
+from app.feature_engineer import FeatureEngineer
+from app.feature_validator import validate_before_training
+from app.models import (
     BetHeroBaseModel,
     LightGBMBetModel,
     LSTMBetModel,

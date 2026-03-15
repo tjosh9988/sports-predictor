@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from ..database import get_supabase_admin   # or pass in from caller
+from app.database import get_supabase_admin   # or pass in from caller
 
 logger = logging.getLogger(__name__)
 

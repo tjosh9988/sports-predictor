@@ -12,7 +12,7 @@ import os
 from typing import Dict, Any, List, Optional
 
 from anthropic import Anthropic
-from ..database import get_supabase_admin
+from app.database import get_supabase_admin
 
 logger = logging.getLogger(__name__)
 

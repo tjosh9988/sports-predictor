@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float
 from datetime import datetime
-from .base import Base
+from app.base import Base
 
 
 class ModelPerformance(Base):

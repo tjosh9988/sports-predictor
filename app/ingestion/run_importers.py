@@ -104,13 +104,13 @@ def _build_importer_factory(
     client,
 ) -> Callable | None:
     """Returns a callable that creates and runs the correct importer, or None if dir missing."""
-    from .football_importer import FootballImporter
-    from .tennis_importer   import TennisImporter
-    from .nba_importer      import NBAImporter
-    from .nfl_importer      import NFLImporter
-    from .cricket_importer  import CricketImporter
-    from .nhl_importer      import NHLImporter
-    from .mlb_importer      import MLBImporter
+    from app.football_importer import FootballImporter
+    from app.tennis_importer   import TennisImporter
+    from app.nba_importer      import NBAImporter
+    from app.nfl_importer      import NFLImporter
+    from app.cricket_importer  import CricketImporter
+    from app.nhl_importer      import NHLImporter
+    from app.mlb_importer      import MLBImporter
 
     sport_dir_map = {
         "football":   stats_root / "football",
@@ -347,7 +347,7 @@ def main() -> int:
     else:
         logger.info("Connecting to Supabase …")
         try:
-            from ..database import get_supabase_admin, check_supabase_health
+            from app.database import get_supabase_admin, check_supabase_health
             client = get_supabase_admin()
             if not check_supabase_health():
                 logger.critical("❌ Supabase health check failed — aborting")

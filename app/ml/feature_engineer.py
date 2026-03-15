@@ -31,7 +31,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .elo_calculator import get_elo_at_date, STARTING_RATING
+from app.elo_calculator import get_elo_at_date, STARTING_RATING
 
 logger = logging.getLogger(__name__)
 

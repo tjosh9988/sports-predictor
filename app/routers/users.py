@@ -8,8 +8,8 @@ import logging
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from ..database import get_supabase_admin
-from ..schemas.schemas import UserPreferenceOut, UserPreferenceBase
+from app.database import get_supabase_admin
+from app.schemas.schemas import UserPreferenceOut, UserPreferenceBase
 
 logger = logging.getLogger(__name__)
 

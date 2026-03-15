@@ -49,8 +49,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..redis_client import get_redis
-from .feature_engineer import FeatureEngineer
+from app.redis_client import get_redis
+from app.feature_engineer import FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +389,7 @@ class FeatureStore:
         )
         df["match_date"] = pd.to_datetime(df["match_date"], errors="coerce").dt.tz_localize(None)
 
-        from .feature_engineer import FormCalculator
+        from app.feature_engineer import FormCalculator
         fc    = FormCalculator(df)
         feats = fc.compute(before_dt, prefix="team")
 

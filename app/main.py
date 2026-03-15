@@ -14,10 +14,10 @@ from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .config import settings
-from .database import check_supabase_health, get_supabase_admin
-from .redis_client import get_redis_client, check_redis_health
-from .routers import predictions_router, results_router, sports_router, users_router
+from app.config import settings
+from app.database import check_supabase_health, get_supabase_admin
+from app.redis_client import get_redis_client, check_redis_health
+from app.routers import predictions_router, results_router, sports_router, users_router
 
 # ─────────────────────────── Setup ─────────────────────────────────────────
 
@@ -91,8 +91,8 @@ async def lifespan(app: FastAPI):
     # In a real microservice, these might run as separate worker processes.
     # Here we simulate starting the specialized background jobs.
     logger.info("⏰ Initializing Weekly Trainer and Daily Accumulator jobs...")
-    # from .ml.training_pipeline import start_scheduler
-    # from .ml.accumulator_builder import run_accumulator_job
+    # from app.ml.training_pipeline import start_scheduler
+    # from app.ml.accumulator_builder import run_accumulator_job
     # asyncio.create_task(run_scheduler_in_background())
     
     yield

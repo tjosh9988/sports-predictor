@@ -9,8 +9,8 @@ from typing import List, Optional, Dict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
-from ..database import get_supabase_admin
-from ..schemas.schemas import PredictionOut, ModelPerformanceOut
+from app.database import get_supabase_admin
+from app.schemas.schemas import PredictionOut, ModelPerformanceOut
 
 logger = logging.getLogger(__name__)
 

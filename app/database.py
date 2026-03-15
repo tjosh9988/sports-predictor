@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
 
-from .config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

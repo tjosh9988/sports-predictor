@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .base_importer import BaseImporter
+from app.base_importer import BaseImporter
 
 logger = logging.getLogger(__name__)
 

@@ -60,17 +60,17 @@ from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.preprocessing import LabelEncoder, label_binarize
 from xgboost import XGBClassifier
 
-from .base_model import (
+from app.base_model import (
     BetHeroBaseModel,
     CalibrationMethod,
     PredictionBatch,
     TrainingResult,
 )
-from .lstm_model import LSTMBetModel
-from .lightgbm_model import LightGBMBetModel
-from .neural_network_model import NeuralNetworkBetModel
-from .random_forest_model import RandomForestBetModel
-from .xgboost_model import XGBoostBetModel
+from app.lstm_model import LSTMBetModel
+from app.lightgbm_model import LightGBMBetModel
+from app.neural_network_model import NeuralNetworkBetModel
+from app.random_forest_model import RandomForestBetModel
+from app.xgboost_model import XGBoostBetModel
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 logger = logging.getLogger(__name__)

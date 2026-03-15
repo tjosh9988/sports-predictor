@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, JSON
-from .base import Base
+from app.base import Base
 
 
 class UserPreference(Base):

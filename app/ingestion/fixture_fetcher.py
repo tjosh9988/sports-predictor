@@ -30,8 +30,8 @@ from tenacity import (
     before_sleep_log,
 )
 
-from ..config import settings
-from ..database import get_supabase_admin
+from app.config import settings
+from app.database import get_supabase_admin
 
 logger = logging.getLogger(__name__)
 

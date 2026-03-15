@@ -37,9 +37,9 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score
 
-from ..database import get_supabase_admin
-from .models import StackingEnsemble
-from .training_pipeline import TrainingDataLoader, MARKETS, SUPPORTED_SPORTS
+from app.database import get_supabase_admin
+from app.models import StackingEnsemble
+from app.training_pipeline import TrainingDataLoader, MARKETS, SUPPORTED_SPORTS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

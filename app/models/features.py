@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from .base import Base
+from app.base import Base
 
 
 class TeamFeature(Base):

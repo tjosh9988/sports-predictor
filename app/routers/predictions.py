@@ -9,8 +9,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from ..database import get_supabase_admin
-from ..schemas.schemas import PredictionOut, AccumulatorOut, MatchOut
+from app.database import get_supabase_admin
+from app.schemas.schemas import PredictionOut, AccumulatorOut, MatchOut
 
 logger = logging.getLogger(__name__)
 

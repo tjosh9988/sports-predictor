@@ -36,8 +36,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .feature_engineer import FeatureEngineer
-from .models import EnsembleModel, MODEL_DIR, CLASSES, BINARY_CLS
+from app.feature_engineer import FeatureEngineer
+from app.models import EnsembleModel, MODEL_DIR, CLASSES, BINARY_CLS
 
 logger = logging.getLogger(__name__)
 

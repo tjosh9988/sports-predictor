@@ -447,7 +447,7 @@ def run_elo_for_all_sports(supabase_client) -> dict[str, int]:
     Convenience: run Elo calculation for all 7 sports.
     Returns {sport_slug: snapshots_stored}.
     """
-    from ..ingestion.run_importers import SPORT_ORDER
+    from app.ingestion.run_importers import SPORT_ORDER
     # Deduplicate tennis Tours into one slug
     slugs = []
     for s in SPORT_ORDER:
@@ -509,7 +509,7 @@ if __name__ == "__main__":
                    help="Also sync final ratings back to teams.elo_rating")
     args = p.parse_args()
 
-    from ..database import get_supabase_admin
+    from app.database import get_supabase_admin
     client = get_supabase_admin()
 
     if args.sport:

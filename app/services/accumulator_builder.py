@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Set, Dict, Any, Optional
 
-from .ev_calculator import EVCalculator, MarketOdds
-from ..database import get_supabase_admin
+from app.ev_calculator import EVCalculator, MarketOdds
+from app.database import get_supabase_admin
 
 logger = logging.getLogger(__name__)
 

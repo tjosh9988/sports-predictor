@@ -9,8 +9,8 @@ from typing import List
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
-from ..database import get_supabase_admin
-from ..schemas.schemas import SportOut, LeagueOut, MatchOut
+from app.database import get_supabase_admin
+from app.schemas.schemas import SportOut, LeagueOut, MatchOut
 
 logger = logging.getLogger(__name__)
 

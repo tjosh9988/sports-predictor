@@ -42,12 +42,12 @@ from pathlib import Path
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ..config import settings
-from ..database import get_supabase_admin
-from ..redis_client import get_redis_client
-from .backtester import Backtester, BacktestMetric
-from .feature_validator import validate_before_training
-from .models import (
+from app.config import settings
+from app.database import get_supabase_admin
+from app.redis_client import get_redis_client
+from app.backtester import Backtester, BacktestMetric
+from app.feature_validator import validate_before_training
+from app.models import (
     BetHeroBaseModel,
     MARKETS,
     SUPPORTED_SPORTS,
@@ -105,7 +105,7 @@ class MasterTrainingPipeline:
         
         # 1. Training (includes Feature Validation internally or as pre-step)
         # Note: We reuse the TrainingPipeline logic but wrapped here for promotion.
-        from .training_pipeline_logic import ModelTrainer, PipelineConfig, MLflowLogger
+        from app.training_pipeline_logic import ModelTrainer, PipelineConfig, MLflowLogger
         
         # We'll use the Ensemble as our primary target for production
         config = PipelineConfig(sport=sport, market=market, model_name="StackingEnsemble", force=force)
