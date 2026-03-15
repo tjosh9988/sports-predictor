@@ -1,0 +1,58 @@
+services:
+  # FastAPI Web Service
+  - type: web
+    name: bet-hero-api
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SUPABASE_URL
+        fromConfig: SUPABASE_URL
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        fromConfig: SUPABASE_SERVICE_ROLE_KEY
+      - key: REDIS_URL
+        fromConfig: REDIS_URL
+      - key: ANTHROPIC_API_KEY
+        fromConfig: ANTHROPIC_API_KEY
+      - key: MLFLOW_TRACKING_URI
+        fromConfig: MLFLOW_TRACKING_URI
+      - key: MODELS_DIR
+        value: "/opt/render/project/src/models"
+
+  # Celery Worker for Background Jobs
+  - type: worker
+    name: bet-hero-worker
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerCommand: "celery -A app.worker worker --loglevel=info"
+    plan: starter
+    region: frankfurt
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SUPABASE_URL
+        fromConfig: SUPABASE_URL
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        fromConfig: SUPABASE_SERVICE_ROLE_KEY
+      - key: REDIS_URL
+        fromConfig: REDIS_URL
+      - key: ANTHROPIC_API_KEY
+        fromConfig: ANTHROPIC_API_KEY
+
+envVarGroups:
+  - name: bet-hero-config
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MLFLOW_TRACKING_URI
+        sync: false
