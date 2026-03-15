@@ -7,7 +7,7 @@ pydantic-settings==2.6.1
 
 # Supabase
 supabase==2.10.0
-postgrest==0.18.1
+postgrest==0.18.0
 
 # Redis / Upstash
 redis==5.2.0
