@@ -47,3 +47,6 @@ python-multipart==0.0.9
 python-jose==3.3.0
 passlib==1.7.4
 matplotlib==3.9.0
+tenacity==8.2.3
+aiohttp==3.9.3
+pytz==2024.1
