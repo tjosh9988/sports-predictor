@@ -3,35 +3,20 @@ import pandas as pd
 from datetime import datetime
 from app.database import get_supabase_admin
 
-STORAGE_BUCKET = "sports-data"
+BUCKET = "sports-data"
 
-def get_storage_files(sport: str):
-    """Get all files for a sport from Supabase Storage"""
-    supabase = get_supabase_admin()
-    try:
-        files = supabase.storage.from_(STORAGE_BUCKET)\
-            .list(f"stats/{sport}")
-        return files or []
-    except Exception as e:
-        print(f"Error listing {sport} files: {e}")
-        return []
-
-def download_file(sport: str, filename: str) -> str:
-    """Download a file from storage to /tmp"""
-    supabase = get_supabase_admin()
-    storage_path = f"stats/{sport}/{filename}"
-    local_path = f"/tmp/{sport}_{filename}"
-    
-    try:
-        data = supabase.storage.from_(STORAGE_BUCKET)\
-            .download(storage_path)
-        with open(local_path, "wb") as f:
-            f.write(data)
-        print(f"Downloaded: {storage_path}")
-        return local_path
-    except Exception as e:
-        print(f"Download error {storage_path}: {e}")
-        return None
+FOLDER_MAP = {
+    "football": "football",
+    "tennis": "tennis_atp",
+    "tennis_atp": "tennis_atp",
+    "tennis_wta": "tennis_wta",
+    "nba": "nba",
+    "nfl": "nfl",
+    "cricket": "cricket",
+    "nhl": "nhl",
+    "mlb": "mlb",
+    "basketball": "nba",
+}
 
 def insert_matches_batch(
     matches: list, 
@@ -280,36 +265,54 @@ def process_generic_file(
     return matches
 
 async def run_single_importer(sport: str):
-    """Run importer for a single sport"""
-    print(f"Starting import for: {sport}")
+    folder = FOLDER_MAP.get(sport, sport)
+    print(f"Starting import for: {sport} -> folder: {folder}")
     
-    files = get_storage_files(sport)
-    
-    if not files:
-        print(f"No files found in storage for {sport}")
+    supabase = get_supabase_admin()
+    try:
+        files = supabase.storage\
+            .from_(BUCKET)\
+            .list(folder)
+        
+        if not files:
+            print(f"No files found in storage/{folder}")
+            return 0
+            
+        # Filter only CSV/JSON
+        data_files = [
+            f for f in files 
+            if f.get("name","").endswith(('.csv','.json'))
+        ]
+        
+        print(f"Found {len(data_files)} files in {folder}")
+        
+    except Exception as e:
+        print(f"Storage list error: {e}")
         return 0
     
-    print(f"Found {len(files)} files for {sport}")
     total_inserted = 0
-    
-    for file_info in files:
-        filename = file_info.get("name", "")
-        if not filename.endswith(('.csv', '.json')):
-            continue
-        
-        print(f"Processing: {sport}/{filename}")
-        local_path = download_file(sport, filename)
-        
-        if not local_path:
-            continue
+    for file_info in data_files:
+        filename = file_info.get("name","")
+        storage_path = f"{folder}/{filename}"
+        local_path = f"/tmp/{sport}_{filename}"
         
         try:
-            if sport == "football":
+            # Download from storage
+            print(f"Downloading: {storage_path}")
+            data = supabase.storage\
+                .from_(BUCKET)\
+                .download(storage_path)
+            
+            with open(local_path, "wb") as f:
+                f.write(data)
+            
+            # Process based on sport
+            if sport in ["football"]:
                 matches = process_football_file(local_path)
             elif sport in ["tennis", "tennis_atp", 
                            "tennis_wta"]:
                 matches = process_tennis_file(local_path)
-            elif sport == "nba":
+            elif sport in ["nba", "basketball"]:
                 matches = process_nba_file(local_path)
             else:
                 matches = process_generic_file(
@@ -321,26 +324,29 @@ async def run_single_importer(sport: str):
                     matches, sport
                 )
                 total_inserted += inserted
-                print(f"{sport}/{filename}: "
-                      f"{inserted} records inserted")
+                
         except Exception as e:
             print(f"Error processing {filename}: {e}")
         finally:
-            # Clean up temp file
             try:
                 os.remove(local_path)
             except:
                 pass
     
-    print(f"Import complete for {sport}: "
-          f"{total_inserted} total records")
+    print(f"Import complete: {sport} = {total_inserted} records")
     return total_inserted
 
 async def run_all_importers():
     """Run all sport importers sequentially"""
     sports = [
-        "football", "tennis_atp", "tennis_wta",
-        "nba", "nfl", "cricket", "nhl", "mlb"
+        "football",
+        "tennis_atp", 
+        "tennis_wta",
+        "nba",
+        "nfl",
+        "cricket",
+        "nhl",
+        "mlb"
     ]
     
     total = 0

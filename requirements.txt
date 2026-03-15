@@ -50,3 +50,4 @@ matplotlib==3.9.0
 tenacity==8.2.3
 aiohttp==3.9.3
 pytz==2024.1
+psycopg2-binary==2.9.9
