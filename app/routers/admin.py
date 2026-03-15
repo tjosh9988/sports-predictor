@@ -103,6 +103,65 @@ async def trigger_training(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.get("/debug/storage/{sport}")
+async def debug_storage(sport: str):
+    from app.database import get_supabase_admin
+    supabase = get_supabase_admin()
+    
+    results = {}
+    
+    # Test 1: List files in bucket
+    try:
+        files = supabase.storage\
+            .from_("sports-data")\
+            .list(sport)
+        results["files_found"] = len(files) if files else 0
+        results["file_names"] = [
+            f.get("name") for f in (files or [])
+        ][:5]  # First 5 only
+    except Exception as e:
+        results["storage_error"] = str(e)
+    
+    # Test 2: Try downloading first file
+    if results.get("files_found", 0) > 0:
+        first_file = results["file_names"][0]
+        try:
+            data = supabase.storage\
+                .from_("sports-data")\
+                .download(f"{sport}/{first_file}")
+            results["download_size"] = len(data)
+            results["download_status"] = "success"
+            
+            # Test 3: Try reading as CSV
+            import io
+            import pandas as pd
+            df = pd.read_csv(
+                io.BytesIO(data), 
+                low_memory=False,
+                nrows=5
+            )
+            results["csv_columns"] = list(df.columns)
+            results["csv_rows_sample"] = 5
+            results["csv_status"] = "readable"
+            
+        except Exception as e:
+            results["download_error"] = str(e)
+    
+    # Test 4: Test database insert
+    try:
+        from app.database import get_supabase_admin
+        db = get_supabase_admin()
+        test = db.table("matches")\
+            .select("id")\
+            .limit(1)\
+            .execute()
+        results["db_status"] = "connected"
+        results["db_matches_count"] = len(test.data)
+    except Exception as e:
+        results["db_error"] = str(e)
+    
+    return results
+
 @router.get("/health/full")
 async def full_health():
     """Check all service connections"""
