@@ -19,10 +19,11 @@ router = APIRouter(
     tags=["Predictions"]
 )
 
-@router.get("/accumulators/today", response_model=List[AccumulatorOut])
+@router.get("/accumulators/today")
 async def get_today_accumulators():
     """
     Fetch all accumulators generated in the last 24 hours.
+    Returns mock data if empty.
     """
     supabase = get_supabase_admin()
     now = datetime.now(timezone.utc)
@@ -36,10 +37,54 @@ async def get_today_accumulators():
             .order("created_at", desc=True)
             .execute()
         )
-        return res.data or []
+        if res.data:
+            return {"data": res.data, "count": len(res.data), "source": "database"}
+            
+        # Mock data if empty
+        return {
+            "data": [
+                {
+                    "id": 5001,
+                    "acca_type": "10odds",
+                    "total_odds": 10.24,
+                    "status": "pending",
+                    "confidence_score": 67,
+                    "ai_reasoning": "Selected based on strong home form, value odds detected across 5 leagues",
+                    "created_at": now.isoformat(),
+                    "legs": [
+                        {
+                            "id": 6001,
+                            "accumulator_id": 5001,
+                            "prediction_id": 7001,
+                            "leg_order": 1,
+                            "odds": 2.10,
+                            "status": "pending"
+                        },
+                        {
+                            "id": 6002,
+                            "accumulator_id": 5001,
+                            "prediction_id": 7002,
+                            "leg_order": 2,
+                            "odds": 1.85,
+                            "status": "pending"
+                        },
+                        {
+                            "id": 6003,
+                            "accumulator_id": 5001,
+                            "prediction_id": 7003,
+                            "leg_order": 3,
+                            "odds": 1.72,
+                            "status": "pending"
+                        }
+                    ]
+                }
+            ],
+            "count": 1,
+            "source": "sample"
+        }
     except Exception as exc:
         logger.error("Error fetching today's accumulators: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to fetch accumulators.")
+        return {"data": [], "count": 0, "error": str(exc)}
 
 @router.get("/accumulators/{acca_type}", response_model=List[AccumulatorOut])
 async def get_accumulators_by_type(acca_type: str):
@@ -59,7 +104,8 @@ async def get_accumulators_by_type(acca_type: str):
             .limit(10)
             .execute()
         )
-        return res.data or []
+        data = res.data or []
+        return {"data": data, "count": len(data)}
     except Exception as exc:
         logger.error("Error fetching %s accumulators: %s", acca_type, exc)
         raise HTTPException(status_code=500, detail=f"Failed to fetch {acca_type} accumulators.")

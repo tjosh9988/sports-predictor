@@ -27,7 +27,8 @@ async def get_sports():
     supabase = get_supabase_admin()
     try:
         res = supabase.table("sports").select("*").execute()
-        return res.data or []
+        data = res.data or []
+        return {"data": data, "count": len(data)}
     except Exception as exc:
         logger.error("Error fetching sports: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to fetch sports.")
@@ -57,10 +58,11 @@ async def get_sport_leagues(sport: str):
         logger.error("Error fetching leagues for %s: %s", sport, exc)
         raise HTTPException(status_code=500, detail="Failed to fetch leagues.")
 
-@router.get("/{sport}/fixtures", response_model=List[MatchOut])
+@router.get("/{sport}/fixtures")
 async def get_sport_fixtures(sport: str, date: Optional[str] = None):
     """
     Fetch upcoming fixtures for a specific sport, optionally filtered by date.
+    Returns mock data if the database is empty.
     """
     supabase = get_supabase_admin()
     try:
@@ -72,7 +74,6 @@ async def get_sport_fixtures(sport: str, date: Optional[str] = None):
         query = supabase.table("matches").select("*").eq("sport_id", sport_id)
         
         if date:
-            # Filter for the specific date (00:00:00 to 23:59:59)
             start_date = f"{date}T00:00:00Z"
             end_date = f"{date}T23:59:59Z"
             query = query.gte("match_date", start_date).lte("match_date", end_date)
@@ -81,9 +82,41 @@ async def get_sport_fixtures(sport: str, date: Optional[str] = None):
             query = query.eq("status", "upcoming").gte("match_date", now)
             
         res = query.order("match_date", desc=False).execute()
-        return res.data or []
+        
+        if res.data:
+            return {"data": res.data, "count": len(res.data), "source": "database"}
+            
+        # Mock/Sample data if empty
+        return {
+            "data": [
+                {
+                    "id": 10001,
+                    "sport_id": sport_id,
+                    "league_id": 1,
+                    "home_team_id": 1,
+                    "away_team_id": 2,
+                    "match_date": "2026-03-15T15:00:00Z",
+                    "status": "upcoming",
+                    "venue": "Emirates Stadium",
+                    "round": "Matchday 28"
+                },
+                {
+                    "id": 10002, 
+                    "sport_id": sport_id,
+                    "league_id": 2,
+                    "home_team_id": 3,
+                    "away_team_id": 4,
+                    "match_date": "2026-03-15T20:00:00Z",
+                    "status": "upcoming",
+                    "venue": "Santiago Bernabeu",
+                    "round": "Matchday 28"
+                }
+            ],
+            "count": 2,
+            "source": "sample"
+        }
     except HTTPException:
         raise
     except Exception as exc:
         logger.error("Error fetching fixtures for %s: %s", sport, exc)
-        raise HTTPException(status_code=500, detail="Failed to fetch fixtures.")
+        return {"data": [], "count": 0, "error": str(exc)}
