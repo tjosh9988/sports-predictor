@@ -94,15 +94,24 @@ def engineer_features(df: pd.DataFrame, sport: str):
             team_games.get(away, 1), 1
         )
         
+        h_odds = float(row.get("home_odds", 2.0) or 2.0)
+        a_odds = float(row.get("away_odds", 2.0) or 2.0)
+        d_odds = float(row.get("draw_odds", 3.0) or 3.0)
+        
         feature = [
             home_wr,
             away_wr,
             home_wr - away_wr,
             team_games.get(home, 0),
             team_games.get(away, 0),
-            float(row.get("home_odds", 2.0) or 2.0),
-            float(row.get("away_odds", 2.0) or 2.0),
-            float(row.get("draw_odds", 3.0) or 3.0),
+            h_odds,
+            a_odds,
+            d_odds,
+            1 / h_odds,   # NEW: implied_home_prob
+            1 / a_odds,   # NEW: implied_away_prob
+            1 if h_odds < a_odds else 0, # NEW: market_favorite
+            h_odds / a_odds,  # NEW: odds_ratio
+            home_wr - 0.5,    # NEW: form_momentum
         ]
         
         # Determine result
