@@ -268,3 +268,53 @@ async def create_fixtures(background_tasks: BackgroundTasks):
     from app.ingestion.fixture_fetcher import create_upcoming_fixtures_from_history
     background_tasks.add_task(create_upcoming_fixtures_from_history)
     return {"status": "started", "message": "Creating upcoming fixtures from historical teams"}
+
+@router.get("/debug/api-sports")
+async def debug_api_sports():
+    import httpx
+    import os
+    api_key = os.getenv("API_SPORTS_KEY", "")
+    
+    if not api_key:
+        return {"error": "API_SPORTS_KEY not set in environment"}
+    
+    results = {}
+    
+    # Test 1: Check API status
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://v3.football.api-sports.io/status",
+                headers={"x-apisports-key": api_key}
+            )
+            results["api_status_code"] = resp.status_code
+            results["api_response"] = resp.json()
+    except Exception as e:
+        results["api_error"] = str(e)
+    
+    # Test 2: Try fixtures
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://v3.football.api-sports.io/fixtures",
+                headers={"x-apisports-key": api_key},
+                params={"next": 5}
+            )
+            data = resp.json()
+            results["fixtures_status"] = resp.status_code
+            results["fixtures_count"] = len(data.get("response", []))
+            results["fixtures_errors"] = data.get("errors", {})
+            results["api_requests_used"] = data.get("results", 0)
+            if data.get("response"):
+                f = data["response"][0]
+                results["sample_fixture"] = {
+                    "home": f.get("teams",{}).get("home",{}).get("name"),
+                    "away": f.get("teams",{}).get("away",{}).get("name"),
+                    "date": f.get("fixture",{}).get("date"),
+                    "league": f.get("league",{}).get("name"),
+                }
+    except Exception as e:
+        results["fixtures_error"] = str(e)
+    
+    results["key_preview"] = api_key[:8] + "..." if api_key else "MISSING"
+    return results
