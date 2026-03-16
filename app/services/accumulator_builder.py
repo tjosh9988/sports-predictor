@@ -1,10 +1,17 @@
 import os
 import joblib
-import numpy as np
+import io
 import asyncio
-from datetime import datetime
+import logging
+import numpy as np
+import pandas as pd
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import List, Set, Dict, Any, Optional
 from anthropic import Anthropic
 from app.database import get_supabase_admin
+
+logger = logging.getLogger(__name__)
 
 MODELS_DIR = "/tmp/models"
 
@@ -15,8 +22,8 @@ try:
 except Exception:
     anthropic_client = None
 
-
 def load_best_model(sport: str):
+    # Try local first
     for name in ["xgboost", "random_forest", "lightgbm"]:
         path = f"{MODELS_DIR}/{sport}_{name}.pkl"
         if os.path.exists(path):
@@ -24,7 +31,48 @@ def load_best_model(sport: str):
                 return joblib.load(path), name
             except Exception:
                 continue
+    
+    # Download from Supabase Storage
+    print(f"Models not in /tmp - downloading from storage...")
+    from app.database import get_supabase_admin
+    import joblib
+    import io
+    
+    supabase = get_supabase_admin()
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    
+    for name in ["xgboost", "random_forest", "lightgbm"]:
+        storage_path = f"models/{sport}_{name}.pkl"
+        try:
+            data = supabase.storage\
+                .from_("sports-data")\
+                .download(storage_path)
+            
+            local_path = f"{MODELS_DIR}/{sport}_{name}.pkl"
+            with open(local_path, "wb") as f:
+                f.write(data)
+            
+            model = joblib.load(local_path)
+            print(f"Loaded {sport} {name} from storage")
+            return model, name
+        except Exception as e:
+            continue
+    
+    print(f"No model found for {sport}")
     return None, None
+
+@dataclass
+class Selection:
+    prediction_id: int
+    match_id: int
+    sport: str
+    league: str
+    market: str
+    outcome: str
+    odds: float
+    model_prob: float
+    confidence: float
+    ev: float
 
 
 def get_team_form(supabase, team: str, sport: str) -> float:

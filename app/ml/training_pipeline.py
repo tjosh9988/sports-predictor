@@ -21,6 +21,37 @@ except ImportError as e:
 
 MODELS_DIR = "/tmp/models"
 
+def save_model_to_storage(
+    model, 
+    sport: str, 
+    model_name: str
+):
+    import joblib
+    import io
+    from app.database import get_supabase_admin
+    
+    supabase = get_supabase_admin()
+    
+    # Save to bytes
+    buffer = io.BytesIO()
+    joblib.dump(model, buffer)
+    buffer.seek(0)
+    
+    storage_path = f"models/{sport}_{model_name}.pkl"
+    
+    try:
+        supabase.storage.from_("sports-data").upload(
+            path=storage_path,
+            file=buffer.read(),
+            file_options={
+                "content-type": "application/octet-stream",
+                "upsert": "true"
+            }
+        )
+        print(f"Model saved to storage: {storage_path}")
+    except Exception as e:
+        print(f"Model storage error: {e}")
+
 def get_training_data(sport: str) -> pd.DataFrame:
     """Fetch training data from Supabase"""
     supabase = get_supabase_admin()
@@ -201,6 +232,9 @@ async def train_sport_models(sport: str):
         try:
             print(f"Training {model_name}...")
             model.fit(X_train, y_train)
+            
+            # Persistent Storage: Upload to Supabase
+            save_model_to_storage(model, sport, model_name)
             
             y_pred = model.predict(X_test)
             accuracy = accuracy_score(y_test, y_pred)
