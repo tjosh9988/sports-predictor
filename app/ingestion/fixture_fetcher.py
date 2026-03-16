@@ -177,122 +177,77 @@ async def fetch_sport_fixtures(
     return inserted
 
 async def fetch_football_with_odds():
-    """Fetch football fixtures with separate odds call"""
+    from datetime import datetime, timedelta
+    import httpx
+    from app.database import get_supabase_admin
+    
     supabase = get_supabase_admin()
     inserted = 0
     
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            # Get next 50 football fixtures
-            resp = await client.get(
-                "https://v3.football.api-sports.io/fixtures",
-                headers=HEADERS,
-                params={"next": 50}
-            )
+    # Fetch fixtures for next 7 days
+    # using date parameter (works on free plan)
+    today = datetime.now()
+    
+    async with httpx.AsyncClient(timeout=30) as client:
+        for days_ahead in range(0, 7):
+            target_date = today + timedelta(days=days_ahead)
+            date_str = target_date.strftime("%Y-%m-%d")
             
-            if resp.status_code != 200:
-                print(f"Football API status: {resp.status_code}")
-                return 0
+            print(f"Fetching football fixtures for {date_str}...")
             
-            data = resp.json()
-            fixtures = data.get("response", [])
-            print(f"Football: {len(fixtures)} upcoming fixtures")
-            
-            for f in fixtures:
-                match = map_football_fixture(f)
+            try:
+                resp = await client.get(
+                    "https://v3.football.api-sports.io/fixtures",
+                    headers={"x-apisports-key": API_KEY},
+                    params={"date": date_str}
+                )
                 
-                if not match["home_team"]:
+                if resp.status_code != 200:
+                    print(f"Error {resp.status_code} for {date_str}")
                     continue
                 
-                # Get fixture ID for odds lookup
-                fixture_id = f.get("fixture", {}).get("id")
+                data = resp.json()
+                errors = data.get("errors", {})
                 
-                # Try to get odds
-                if fixture_id:
-                    try:
-                        odds_resp = await client.get(
-                            "https://v3.football.api-sports.io/odds",
-                            headers=HEADERS,
-                            params={
-                                "fixture": fixture_id,
-                                "bookmaker": 6  # Bet365
-                            }
-                        )
-                        if odds_resp.status_code == 200:
-                            odds_data = odds_resp.json()
-                            odds_response = odds_data.get("response", [])
-                            if odds_response:
-                                bks = odds_response[0].get("bookmakers", [])
-                                if bks:
-                                    bets = bks[0].get("bets", [])
-                                    for bet in bets:
-                                        if bet.get("name") == "Match Winner":
-                                            for v in bet.get("values", []):
-                                                if v.get("value") == "Home":
-                                                    match["home_odds"] = float(v.get("odd", 2.0))
-                                                elif v.get("value") == "Away":
-                                                    match["away_odds"] = float(v.get("odd", 2.0))
-                                                elif v.get("value") == "Draw":
-                                                    match["draw_odds"] = float(v.get("odd", 3.0))
-                        await asyncio.sleep(0.5)  # Rate limit
-                    except:
-                        pass
+                if errors:
+                    print(f"API errors for {date_str}: {errors}")
+                    continue
                 
-                try:
-                    supabase.table("matches").insert(match).execute()
-                    inserted += 1
-                except Exception as e:
-                    # Try upsert if insert fails
+                fixtures = data.get("response", [])
+                print(f"{date_str}: {len(fixtures)} fixtures")
+                
+                for f in fixtures:
                     try:
-                        supabase.table("matches").upsert(match).execute()
+                        match = map_football_fixture(f)
+                        if not match["home_team"]:
+                            continue
+                        
+                        supabase.table("matches")\
+                            .upsert(match)\
+                            .execute()
                         inserted += 1
-                    except:
-                        pass
-            
-    except Exception as e:
-        print(f"Football fetch error: {e}")
+                    except Exception as e:
+                        continue
+                
+                # Rate limit — 100 req/day = careful
+                await asyncio.sleep(2)
+                
+            except Exception as e:
+                print(f"Date {date_str} error: {e}")
+                continue
     
+    print(f"Football: {inserted} fixtures inserted")
     return inserted
 
 async def fetch_all_fixtures():
-    """Fetch real upcoming fixtures from all sports"""
-    print("Fetching REAL fixtures from API-Sports...")
-    total = 0
+    print("Fetching real fixtures from API-Sports...")
     
-    # Football with odds
+    # Football - primary sport
     count = await fetch_football_with_odds()
-    total += count
     print(f"Football fixtures: {count}")
     
-    # Other sports
-    other_sports = [
-        ("basketball", 
-         "https://v1.basketball.api-sports.io/games",
-         {"next": 50, "league": "12", "season": "2024-2025"},
-         "map_basketball_fixture"),
-    ]
-    
-    for sport, url, params, mapper_name in other_sports:
-        try:
-            count = await fetch_sport_fixtures(
-                sport, url, params, mapper_name
-            )
-            total += count
-            print(f"{sport} fixtures: {count}")
-            await asyncio.sleep(1)
-        except Exception as e:
-            print(f"{sport} error: {e}")
-    
-    print(f"Total real fixtures fetched: {total}")
-    
-    # Verify what was saved
-    supabase = get_supabase_admin()
-    result = supabase.table("matches")\
-        .select("id", count="exact")\
-        .eq("status", "upcoming")\
-        .execute()
-    print(f"Total upcoming in DB: {result.count}")
-    
+    total = count
+    print(f"Total fixtures fetched: {total}")
     return total
 
 async def create_upcoming_fixtures_from_history():
