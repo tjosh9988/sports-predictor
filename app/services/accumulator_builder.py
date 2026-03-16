@@ -14,6 +14,7 @@ from app.database import get_supabase_admin
 logger = logging.getLogger(__name__)
 
 MODELS_DIR = "/tmp/models"
+_model_cache = {}
 
 try:
     anthropic_client = Anthropic(
@@ -23,25 +24,31 @@ except Exception:
     anthropic_client = None
 
 def load_best_model(sport: str):
-    # Try local first
-    for name in ["xgboost", "random_forest", "lightgbm"]:
+    global _model_cache
+    
+    # Return cached model if available
+    if sport in _model_cache:
+        return _model_cache[sport]
+    
+    # Try local /tmp first
+    for name in ["lightgbm", "xgboost", "random_forest"]:
         path = f"{MODELS_DIR}/{sport}_{name}.pkl"
         if os.path.exists(path):
             try:
-                return joblib.load(path), name
+                model = joblib.load(path)
+                _model_cache[sport] = (model, name)
+                print(f"Loaded {sport} {name} from local cache")
+                return model, name
             except Exception:
                 continue
     
     # Download from Supabase Storage
-    print(f"Models not in /tmp - downloading from storage...")
+    print(f"Downloading {sport} model from storage...")
     from app.database import get_supabase_admin
-    import joblib
-    import io
-    
     supabase = get_supabase_admin()
     os.makedirs(MODELS_DIR, exist_ok=True)
     
-    for name in ["xgboost", "random_forest", "lightgbm"]:
+    for name in ["lightgbm", "xgboost", "random_forest"]:
         storage_path = f"models/{sport}_{name}.pkl"
         try:
             data = supabase.storage\
@@ -53,12 +60,12 @@ def load_best_model(sport: str):
                 f.write(data)
             
             model = joblib.load(local_path)
-            print(f"Loaded {sport} {name} from storage")
+            _model_cache[sport] = (model, name)
+            print(f"Downloaded and cached {sport} {name}")
             return model, name
-        except Exception as e:
+        except Exception:
             continue
     
-    print(f"No model found for {sport}")
     return None, None
 
 @dataclass
@@ -77,6 +84,7 @@ class Selection:
 
 def get_team_form(supabase, team: str, sport: str) -> float:
     try:
+        # Try exact team name match first
         result = supabase.table("matches")\
             .select("home_team, away_team, home_score, away_score")\
             .eq("sport", sport)\
@@ -87,19 +95,40 @@ def get_team_form(supabase, team: str, sport: str) -> float:
             .execute()
 
         matches = result.data or []
-        if not matches:
-            return 0.5
-
-        wins = 0
-        for m in matches:
-            hs = m.get("home_score") or 0
-            aws = m.get("away_score") or 0
-            if m.get("home_team") == team and hs > aws:
-                wins += 1
-            elif m.get("away_team") == team and aws > hs:
-                wins += 1
-
-        return wins / len(matches)
+        
+        if matches:
+            wins = 0
+            for m in matches:
+                hs = m.get("home_score") or 0
+                aws = m.get("away_score") or 0
+                if m.get("home_team") == team and hs > aws:
+                    wins += 1
+                elif m.get("away_team") == team and aws > hs:
+                    wins += 1
+            return wins / len(matches)
+        
+        # No matches found - use league average
+        # Get average win rate for this sport
+        total = supabase.table("matches")\
+            .select("home_score, away_score")\
+            .eq("sport", sport)\
+            .eq("status", "completed")\
+            .limit(1000)\
+            .execute()
+        
+        if total.data:
+            home_wins = sum(
+                1 for m in total.data
+                if (m.get("home_score") or 0) > 
+                   (m.get("away_score") or 0)
+            )
+            # Home advantage factor
+            home_win_rate = home_wins / len(total.data)
+            # Return slight home advantage as default
+            return home_win_rate
+        
+        return 0.5
+        
     except Exception:
         return 0.5
 
