@@ -179,8 +179,9 @@ async def full_health():
     
     # Check Redis
     try:
-        from app.redis_client import redis_client
-        redis_client.ping()
+        from app.redis_client import get_redis
+        r = get_redis()
+        r.ping()
         health["redis"] = "connected"
     except Exception as e:
         health["redis"] = f"error: {e}"

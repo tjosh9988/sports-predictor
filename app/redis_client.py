@@ -59,10 +59,21 @@ def _init_upstash_with_retry(retries: int = 3, delay: float = 2.0) -> UpstashRed
 
 def get_redis() -> UpstashRedis:
     """Returns the cached Upstash REST client (preferred for production)."""
-    global _upstash_client
+    global _upstash_client, redis_client
     if _upstash_client is None:
         _upstash_client = _init_upstash_with_retry()
+    redis_client = _upstash_client
     return _upstash_client
+
+
+def get_redis_client() -> UpstashRedis:
+    """Alias for get_redis() to support legacy or alternative naming."""
+    return get_redis()
+
+
+# Initial placeholder for the global variable alias
+redis_client: UpstashRedis = None
+
 
 
 # ─────────────────────── redis-py Client (Celery / local) ──────────────────

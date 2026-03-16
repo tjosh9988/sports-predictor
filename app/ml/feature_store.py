@@ -49,7 +49,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.redis_client import get_redis
+from app.redis_client import get_redis_client
 from app.feature_engineer import FeatureEngineer
 
 logger = logging.getLogger(__name__)
