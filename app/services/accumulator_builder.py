@@ -191,7 +191,7 @@ class AccumulatorBuilder:
                 .select(
                     "id, match_id, market, predicted_outcome, "
                     "model_probability, odds, confidence_score, "
-                    "matches(match_date, sport:sports(slug, name), league:leagues(name)), "
+                    "matches(match_date, sport, league), "
                     "odds_history(closing_home, closing_draw, closing_away)"
                 )
                 .gte("matches.match_date", now.isoformat())
@@ -221,8 +221,8 @@ class AccumulatorBuilder:
                 pool.append(Selection(
                     prediction_id=r["id"],
                     match_id=r["match_id"],
-                    sport=match.get("sport", {}).get("slug", "unknown"),
-                    league=match.get("league", {}).get("name", "unknown"),
+                    sport=match.get("sport", "unknown"),
+                    league=match.get("league", "unknown"),
                     market=r["market"],
                     outcome=r["predicted_outcome"],
                     odds=odds,
