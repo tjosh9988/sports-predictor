@@ -117,18 +117,12 @@ async def get_sport_fixtures(sport: str):
     """
     supabase = get_supabase_admin()
     try:
-        # Get sport ID
-        sport_res = supabase.table("sports").select("id").eq("slug", sport).single().execute()
-        if not sport_res.data:
-            raise HTTPException(status_code=404, detail="Sport not found.")
-        
-        sport_id = sport_res.data["id"]
         now = datetime.now(timezone.utc).isoformat()
         
         res = (
             supabase.table("matches")
             .select("*")
-            .eq("sport_id", sport_id)
+            .eq("sport", sport)
             .eq("status", "upcoming")
             .gte("match_date", now)
             .order("match_date", desc=False)

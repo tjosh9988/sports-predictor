@@ -567,7 +567,7 @@ class FeatureEngineer:
         match_id  = match["id"]
         home_id   = match["home_team_id"]
         away_id   = match["away_team_id"]
-        sport_id  = match["sport_id"]
+        sport     = match["sport"]
         league_id = match["league_id"]
         venue     = match.get("venue")
         referee   = match.get("referee_data")
@@ -576,7 +576,7 @@ class FeatureEngineer:
         if match_dt is None:
             raise ValueError(f"Cannot parse match_date for match {match_id}")
 
-        all_matches = self._load_all_sport_matches(sport_id)
+        all_matches = self._load_all_sport_matches(sport)
 
         # ── Per-team history ─────────────────────────────────────
         home_hist_df = self._team_history(home_id, all_matches, before_dt=match_dt, is_home=True)
@@ -656,9 +656,9 @@ class FeatureEngineer:
         m["referee_data"] = m.pop("referees", None)
         return m
 
-    def _load_all_sport_matches(self, sport_id: int) -> pd.DataFrame:
+    def _load_all_sport_matches(self, sport: str) -> pd.DataFrame:
         """Load all finished matches for the sport (cached per sport)."""
-        key = ("sport", sport_id)
+        key = ("sport", sport)
         if key in self._match_cache:
             return self._match_cache[key]
 
@@ -669,7 +669,7 @@ class FeatureEngineer:
                 self.client.table("matches")
                 .select("id, home_team_id, away_team_id, home_score, away_score,"
                         " match_date, league_id, venue, season, round")
-                .eq("sport_id", sport_id)
+                .eq("sport", sport)
                 .eq("status", "finished")
                 .not_.is_("home_score", "null")
                 .order("match_date", desc=False)

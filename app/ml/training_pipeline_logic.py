@@ -109,13 +109,9 @@ class TrainingDataLoader:
         self.client = supabase_client
 
     def load(self, sport: str, market: str) -> pd.DataFrame | None:
-        sport_res = self.client.table("sports").select("id").eq("slug", sport).single().execute()
-        if not sport_res.data: return None
-        sport_id = sport_res.data["id"]
-
         match_res = (self.client.table("matches")
                      .select("id, match_date, home_score, away_score, home_yellow_cards, away_yellow_cards, home_corners, away_corners")
-                     .eq("sport_id", sport_id)
+                     .eq("sport", sport)
                      .eq("status", "finished")
                      .not_.is_("home_score", "null")
                      .order("match_date", desc=False).execute())

@@ -77,6 +77,39 @@ async def fetch_fixtures(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+
+
+@router.get("/train/status")
+async def get_training_status():
+    from app.database import get_supabase_admin
+    supabase = get_supabase_admin()
+    try:
+        result = supabase.table("model_performance")\
+            .select("*")\
+            .order("recorded_at", desc=True)\
+            .limit(20)\
+            .execute()
+        
+        models = result.data or []
+        
+        if not models:
+            return {
+                "status": "no_models_yet",
+                "message": "Training in progress or not started",
+                "models": []
+            }
+        
+        return {
+            "status": "complete",
+            "models": models,
+            "total_models": len(models),
+            "sports_trained": list(set(
+                m.get("sport") for m in models
+            ))
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/train/{sport}")
 async def trigger_training(
     sport: str,

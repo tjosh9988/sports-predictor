@@ -103,7 +103,7 @@ class BaseImporter(ABC):
         self.data_dir = Path(data_dir)
         self.client = supabase_admin   # service-role Supabase client
         self.registry = TeamRegistry(extra_aliases=self.load_aliases())
-        self._sport_id: int | None = None
+        self._sport: str | None = None
         self._league_cache: dict[str, int] = {}
 
     # ── Abstract interface ──────────────────────────────────────
@@ -132,7 +132,7 @@ class BaseImporter(ABC):
 
     def run(self) -> None:
         logger.info("[%s] Starting import from %s", self.sport_slug, self.data_dir)
-        self._sport_id = self._fetch_or_create_sport()
+        self._sport = self._fetch_or_create_sport()
         self._load_team_registry()
 
         files = self._discover_files()
@@ -188,18 +188,18 @@ class BaseImporter(ABC):
 
     # ── Supabase helpers ────────────────────────────────────────
 
-    def _fetch_or_create_sport(self) -> int:
-        res = self.client.table("sports").select("id").eq("slug", self.sport_slug).single().execute()
+    def _fetch_or_create_sport(self) -> str:
+        res = self.client.table("sports").select("slug").eq("slug", self.sport_slug).single().execute()
         if res.data:
-            return res.data["id"]
+            return res.data["slug"]
         ins = self.client.table("sports").insert({"name": self.sport_slug.replace("-", " ").title(), "slug": self.sport_slug}).execute()
-        return ins.data[0]["id"]
+        return ins.data[0]["slug"]
 
     def _load_team_registry(self) -> None:
         res = (
             self.client.table("teams")
             .select("id, name, short_name")
-            .eq("sport_id", self._sport_id)
+            .eq("sport", self._sport)
             .execute()
         )
         for row in (res.data or []):
@@ -211,10 +211,10 @@ class BaseImporter(ABC):
         if team_id:
             return team_id
         # Create new team
-        data = {"sport_id": self._sport_id, "name": name.strip(), "elo_rating": 1500}
+        data = {"sport": self._sport, "name": name.strip(), "elo_rating": 1500}
         res = (
             self.client.table("teams")
-            .upsert(data, on_conflict="sport_id,name")
+            .upsert(data, on_conflict="sport,name")
             .execute()
         )
         tid = res.data[0]["id"]
@@ -225,10 +225,10 @@ class BaseImporter(ABC):
         key = f"{name}|{country}"
         if key in self._league_cache:
             return self._league_cache[key]
-        data = {"sport_id": self._sport_id, "name": name.strip(), "country": country.strip()}
+        data = {"sport": self._sport, "name": name.strip(), "country": country.strip()}
         res = (
             self.client.table("leagues")
-            .upsert(data, on_conflict="sport_id,name,country")
+            .upsert(data, on_conflict="sport,name,country")
             .execute()
         )
         lid = res.data[0]["id"]
@@ -289,7 +289,7 @@ class BaseImporter(ABC):
         league_id   = self._get_or_create_league(league_name, country)
 
         db_row: dict[str, Any] = {
-            "sport_id":     self._sport_id,
+            "sport":        self._sport,
             "league_id":    league_id,
             "home_team_id": home_id,
             "away_team_id": away_id,

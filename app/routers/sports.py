@@ -40,15 +40,10 @@ async def get_sport_leagues(sport: str):
     """
     supabase = get_supabase_admin()
     try:
-        sport_res = supabase.table("sports").select("id").eq("slug", sport).single().execute()
-        if not sport_res.data:
-            raise HTTPException(status_code=404, detail="Sport not found.")
-        
-        sport_id = sport_res.data["id"]
         res = (
             supabase.table("leagues")
             .select("*")
-            .eq("sport_id", sport_id)
+            .eq("sport", sport)
             .execute()
         )
         return res.data or []
@@ -71,24 +66,9 @@ async def get_sport_fixtures(sport: str, date: str = None):
                 .eq("status", "upcoming")\
                 .order("match_date")
         else:
-            # Query for specific sport
-            # Note: The database uses sport_id (int). 
-            # We need to map the slug to the ID first unless the table has a 'sport' slug column.
-            # Based on previous implementation, we fetch sport_id.
-            sport_res = supabase.table("sports").select("id").eq("slug", sport).single().execute()
-            if not sport_res.data:
-                # If sport not found, return sample for that sport
-                return {
-                    "data": get_sample_fixtures(sport),
-                    "count": 4,
-                    "source": "sample",
-                    "info": f"Sport '{sport}' not found in database"
-                }
-            
-            sport_id = sport_res.data["id"]
             query = supabase.table("matches")\
                 .select("*")\
-                .eq("sport_id", sport_id)\
+                .eq("sport", sport)\
                 .eq("status", "upcoming")\
                 .order("match_date")
         

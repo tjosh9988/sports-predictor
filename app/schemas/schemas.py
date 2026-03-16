@@ -24,11 +24,11 @@ class LeagueBase(BaseModel):
     tier: int = 1
 
 class LeagueCreate(LeagueBase):
-    sport_id: int
+    sport: str
 
 class LeagueOut(LeagueBase):
     id: int
-    sport_id: int
+    sport: str
     class Config:
         from_attributes = True
 
@@ -42,12 +42,12 @@ class TeamBase(BaseModel):
     elo_rating: float = 1500.0
 
 class TeamCreate(TeamBase):
-    sport_id: int
+    sport: str
     league_id: Optional[int] = None
 
 class TeamOut(TeamBase):
     id: int
-    sport_id: int
+    sport: str
     league_id: Optional[int] = None
     class Config:
         from_attributes = True
@@ -63,11 +63,11 @@ class RefereeBase(BaseModel):
     home_bias_score: float = 0.0
 
 class RefereeCreate(RefereeBase):
-    sport_id: int
+    sport: str
 
 class RefereeOut(RefereeBase):
     id: int
-    sport_id: int
+    sport: str
     class Config:
         from_attributes = True
 
@@ -85,13 +85,13 @@ class MatchBase(BaseModel):
     attendance: Optional[int] = None
 
 class MatchCreate(MatchBase):
-    sport_id: int
+    sport: str
     league_id: int
     referee_id: Optional[int] = None
 
 class MatchOut(MatchBase):
     id: int
-    sport_id: int
+    sport: str
     league_id: int
     referee_id: Optional[int] = None
     home_score: Optional[int] = None

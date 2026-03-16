@@ -193,10 +193,6 @@ class EloCalculator:
         Returns number of snapshots stored.
         """
         logger.info("[Elo/%s] Starting calculation …", self.sport_slug)
-        self._sport_id = self._fetch_sport_id()
-        if not self._sport_id:
-            logger.error("[Elo/%s] Sport not found in DB", self.sport_slug)
-            return 0
 
         matches = self._load_matches()
         logger.info("[Elo/%s] Processing %d matches …", self.sport_slug, len(matches))
@@ -324,16 +320,6 @@ class EloCalculator:
 
     # ── DB I/O ──────────────────────────────────────────────────
 
-    def _fetch_sport_id(self) -> int | None:
-        res = (
-            self.client.table("sports")
-            .select("id")
-            .eq("slug", self.sport_slug)
-            .single()
-            .execute()
-        )
-        return res.data["id"] if res.data else None
-
     def _load_matches(self) -> list[dict]:
         """
         Load all finished matches with league name joined.
@@ -352,7 +338,7 @@ class EloCalculator:
                     " match_date, season, round,"
                     " leagues!inner(name)"
                 )
-                .eq("sport_id", self._sport_id)
+                .eq("sport", self.sport_slug)
                 .eq("status", "finished")
                 .not_.is_("home_score", "null")
                 .not_.is_("away_score", "null")

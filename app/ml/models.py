@@ -701,9 +701,9 @@ class TrainingPipeline:
         res = (
             self.client.table("predictions")
             .select("id, match_id, market, actual_outcome, status, "
-                    "matches!inner(sport_id, match_date, sports!inner(slug))")
+                    "matches!inner(sport, match_date)")
             .eq("status", "CORRECT")
-            .eq("matches.sports.slug", self.sport)
+            .eq("matches.sport", self.sport)
             .ilike("market", f"%{self.market}%")
             .not_.is_("actual_outcome", "null")
             .execute()

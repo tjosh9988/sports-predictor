@@ -199,7 +199,7 @@ class ResultFetcher:
             self.supabase.table("predictions")
             .select(
                 "id, match_id, market, predicted_outcome, "
-                "matches(id, sport_id, match_date, status, home_score, away_score, "
+                "matches(id, sport, match_date, status, home_score, away_score, "
                 "home_team_id, away_team_id, "
                 "sports(slug), "
                 "home:teams!home_team_id(name), away:teams!away_team_id(name))"

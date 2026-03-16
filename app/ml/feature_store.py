@@ -292,11 +292,9 @@ class FeatureStore:
         import concurrent.futures
         on_date = on_date or date.today()
 
-        q = self.client.table("teams").select("id, sport_id")
+        q = self.client.table("teams").select("id, sport")
         if sport_slug:
-            sport_res = self.client.table("sports").select("id").eq("slug", sport_slug).single().execute()
-            if sport_res.data:
-                q = q.eq("sport_id", sport_res.data["id"])
+            q = q.eq("sport", sport_slug)
         teams_res = q.execute()
         team_ids = [r["id"] for r in (teams_res.data or [])]
 

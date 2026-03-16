@@ -235,7 +235,7 @@ class Predictor:
 
         q = (
             self.client.table("matches")
-            .select("id, sport_id, sports!inner(slug)")
+            .select("id, sports!inner(slug)")
             .eq("status", "upcoming")
             .gte("match_date", now.isoformat())
             .lte("match_date", cutoff)

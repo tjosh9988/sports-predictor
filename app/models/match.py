@@ -7,7 +7,7 @@ class Match(Base):
     __tablename__ = "matches"
 
     id = Column(Integer, primary_key=True, index=True)
-    sport_id = Column(Integer, ForeignKey("sports.id"), nullable=False, index=True)
+    sport = Column(String, ForeignKey("sports.slug"), nullable=False, index=True)
     league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False, index=True)
     home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
     away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
@@ -21,7 +21,7 @@ class Match(Base):
     referee_id = Column(Integer, ForeignKey("referees.id"), nullable=True)
     attendance = Column(Integer, nullable=True)
 
-    sport = relationship("Sport", back_populates="matches")
+    sport_rel = relationship("Sport", back_populates="matches")
     league = relationship("League", back_populates="matches")
     home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="home_matches")
     away_team = relationship("Team", foreign_keys=[away_team_id], back_populates="away_matches")

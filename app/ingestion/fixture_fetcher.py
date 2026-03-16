@@ -351,7 +351,7 @@ class FixtureFetcher:
         logger.info("[%s] Upserted %d fixtures, %d odds rows", slug, fixtures_upserted, odds_upserted)
         return fixtures_upserted, odds_upserted
 
-    def _upsert_fixture(self, fixture: dict, sport_id: int) -> int | None:
+    def _upsert_fixture(self, fixture: dict, sport_slug: str) -> int | None:
         """Upsert a single fixture. Returns the match DB id."""
         teams    = fixture.get("teams", {})
         home_t   = teams.get("home", {})
@@ -359,9 +359,9 @@ class FixtureFetcher:
         fx_info  = fixture.get("fixture", {})
         league   = fixture.get("league", {})
 
-        home_id  = self._get_or_create_team(sport_id, home_t.get("name", ""), home_t.get("id"))
-        away_id  = self._get_or_create_team(sport_id, away_t.get("name", ""), away_t.get("id"))
-        league_id = self._get_or_create_league(sport_id, league.get("name", "Unknown"),
+        home_id  = self._get_or_create_team(sport_slug, home_t.get("name", ""), home_t.get("id"))
+        away_id  = self._get_or_create_team(sport_slug, away_t.get("name", ""), away_t.get("id"))
+        league_id = self._get_or_create_league(sport_slug, league.get("name", "Unknown"),
                                                 league.get("country", ""))
 
         match_date = fx_info.get("date", "")
@@ -369,7 +369,7 @@ class FixtureFetcher:
             return None
 
         row = {
-            "sport_id":     sport_id,
+            "sport":        sport_slug,
             "league_id":    league_id,
             "home_team_id": home_id,
             "away_team_id": away_id,
@@ -390,28 +390,23 @@ class FixtureFetcher:
     def _team_name(fixture: dict, side: str) -> str:
         return fixture.get("teams", {}).get(side, {}).get("name", "")
 
-    def _get_sport_id(self, slug: str) -> int | None:
-        if slug in self._sport_cache:
-            return self._sport_cache[slug]
-        res = self.supabase.table("sports").select("id").eq("slug", slug).single().execute()
-        sid = res.data["id"] if res.data else None
-        if sid:
-            self._sport_cache[slug] = sid
-        return sid
+    def _get_sport_id(self, slug: str) -> str:
+        # Returning slug directly now as 'sport_id' is replaced by 'sport' slug
+        return slug
 
-    def _get_or_create_team(self, sport_id: int, name: str, ext_id: Any = None) -> int | None:
+    def _get_or_create_team(self, sport: str, name: str, ext_id: Any = None) -> int | None:
         if not name:
             return None
         res = self.supabase.table("teams").upsert(
-            {"sport_id": sport_id, "name": name, "elo_rating": 1500},
-            on_conflict="sport_id,name",
+            {"sport": sport, "name": name, "elo_rating": 1500},
+            on_conflict="sport,name",
         ).execute()
         return res.data[0]["id"] if res.data else None
 
-    def _get_or_create_league(self, sport_id: int, name: str, country: str) -> int | None:
+    def _get_or_create_league(self, sport: str, name: str, country: str) -> int | None:
         res = self.supabase.table("leagues").upsert(
-            {"sport_id": sport_id, "name": name, "country": country},
-            on_conflict="sport_id,name,country",
+            {"sport": sport, "name": name, "country": country},
+            on_conflict="sport,name,country",
         ).execute()
         return res.data[0]["id"] if res.data else None
 
