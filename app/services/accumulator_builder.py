@@ -1,288 +1,337 @@
-"""
-accumulator_builder.py — Three-pass selection algorithm for betting accumulators.
-"""
-
-from __future__ import annotations
-
 import os
-import logging
-from dataclasses import dataclass
+import joblib
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta, timezone
-from typing import List, Set, Dict, Any, Optional
-
+import asyncio
+from datetime import datetime
+from anthropic import Anthropic
 from app.database import get_supabase_admin
-# from anthropic import Anthropic  
-# from app.ml.predictor import predict_match  
 
-logger = logging.getLogger(__name__)
+MODELS_DIR = "/tmp/models"
 
-@dataclass
-class Selection:
-    prediction_id: int
-    match_id: int
-    sport: str
-    league: str
-    market: str
-    outcome: str
-    odds: float
-    model_prob: float
-    confidence: float
-    ev: float
+try:
+    anthropic_client = Anthropic(
+        api_key=os.getenv("ANTHROPIC_API_KEY", "")
+    )
+except Exception:
+    anthropic_client = None
 
-@dataclass
-class Accumulator:
-    type: str  # "10odds", "5odds", "3odds"
-    selections: List[Selection]
-    total_odds: float
-    combined_ev: float
 
-class AccumulatorBuilder:
-    def __init__(self, supabase_client=None):
-        self.client = supabase_client or get_supabase_admin()
-        self.used_match_ids: Set[int] = set()
-
-    def run(self) -> Dict[str, Optional[Accumulator]]:
-        """
-        Runs the three-pass algorithm and returns the generated accumulators.
-        """
-        logger.info("Starting AccumulatorBuilder three-pass run...")
-        
-        # 1. Fetch available predictions for next 72 hours
-        pool = self._fetch_prediction_pool()
-        if not pool:
-            logger.warning("Prediction pool is empty.")
-            return {"10odds": None, "5odds": None, "3odds": None}
-
-        # 2. Pass 1: Build 10odds (8-12 combined)
-        # Filters: confidence > 55%, odds 1.5-2.5, 5-6 legs
-        acca_10 = self._build_pass(
-            pool=pool,
-            type_name="10odds",
-            min_conf=55.0,
-            min_odds_leg=1.5,
-            max_odds_leg=2.5,
-            target_min_odds=8.0,
-            target_max_odds=12.0,
-            target_legs=(5, 6)
-        )
-
-        # 3. Pass 2: Build 5odds (4-6 combined)
-        # Filters: confidence > 62%, odds 1.35-1.75, 3-4 legs
-        acca_5 = self._build_pass(
-            pool=pool,
-            type_name="5odds",
-            min_conf=62.0,
-            min_odds_leg=1.35,
-            max_odds_leg=1.75,
-            target_min_odds=4.0,
-            target_max_odds=6.0,
-            target_legs=(3, 4)
-        )
-
-        # 4. Pass 3: Build 3odds (2.5-3.5 combined)
-        # Filters: confidence > 70%, odds 1.25-1.55, 2-3 legs
-        acca_3 = self._build_pass(
-            pool=pool,
-            type_name="3odds",
-            min_conf=70.0,
-            min_odds_leg=1.25,
-            max_odds_leg=1.55,
-            target_min_odds=2.5,
-            target_max_odds=3.5,
-            target_legs=(2, 3)
-        )
-
-        results = {
-            "10odds": acca_10,
-            "5odds": acca_5,
-            "3odds": acca_3
-        }
-        
-        # Persist results
-        for acca in results.values():
-            if acca:
-                self._persist_accumulator(acca)
-
-        return results
-
-    def _build_pass(
-        self,
-        pool: List[Selection],
-        type_name: str,
-        min_conf: float,
-        min_odds_leg: float,
-        max_odds_leg: float,
-        target_min_odds: float,
-        target_max_odds: float,
-        target_legs: tuple[int, int]
-    ) -> Optional[Accumulator]:
-        """
-        Generic pass builder logic.
-        """
-        # Filter pool based on criteria + not used
-        eligible = [
-            s for s in pool
-            if s.match_id not in self.used_match_ids
-            and s.confidence >= min_conf
-            and min_odds_leg <= s.odds <= max_odds_leg
-        ]
-
-        # Rank by EV score descending
-        eligible.sort(key=lambda x: x.ev, reverse=True)
-
-        selected: List[Selection] = []
-        current_odds = 1.0
-        used_leagues: Set[str] = set()
-        used_sports: Set[str] = set()
-
-        for s in eligible:
-            # Check de-correlation (Different leagues/sports preferred)
-            # Rule: Select legs from DIFFERENT leagues/sports to reduce correlation
-            if s.league in used_leagues or s.sport in used_sports:
+def load_best_model(sport: str):
+    for name in ["xgboost", "random_forest", "lightgbm"]:
+        path = f"{MODELS_DIR}/{sport}_{name}.pkl"
+        if os.path.exists(path):
+            try:
+                return joblib.load(path), name
+            except Exception:
                 continue
-            
-            # Additional safety: stop if adding this leg exceeds target odds 
-            if current_odds * s.odds > target_max_odds:
-                continue
+    return None, None
 
-            selected.append(s)
-            current_odds *= s.odds
-            used_leagues.add(s.league)
-            used_sports.add(s.sport)
 
-            # Break if we hit the leg count and target odds
-            if len(selected) >= target_legs[1]:
-                break
-        
-        # Final validation
-        if len(selected) < target_legs[0] or current_odds < target_min_odds:
-            logger.warning("[%s] Could not meet target criteria. Found %d legs with %.2f odds.", 
-                           type_name, len(selected), current_odds)
-            # If not enough, the prompt says "build fewer legs at correct odds. Never pad with negative-EV"
-            # Since our pool only contains positive EV, we can return what we have if it's within sensible bounds
-            if not selected:
-                return None
-
-        # Add to used set
-        for s in selected:
-            self.used_match_ids.add(s.match_id)
-
-        return Accumulator(
-            type=type_name,
-            selections=selected,
-            total_odds=round(current_odds, 2),
-            combined_ev=sum(s.ev for s in selected) / len(selected) # Simplified combined EV
-        )
-
-    def _fetch_prediction_pool(self) -> List[Selection]:
-        """
-        Fetches all predictions for upcoming matches, removes overround, 
-        and calculates true EV for each selection.
-        """
-        now = datetime.now(timezone.utc)
-        future = now + timedelta(hours=72)
-
-        try:
-            # Assuming schema from previous tasks
-            res = (
-                self.client.table("predictions")
-                .select(
-                    "id, match_id, market, predicted_outcome, "
-                    "model_probability, odds, confidence_score, "
-                    "matches(match_date, sport, league)"
-                )
-                .gte("matches.match_date", now.isoformat())
-                .lte("matches.match_date", future.isoformat())
-                .execute()
-            )
-            
-            rows = res.data or []
-            pool: List[Selection] = []
-
-            for r in rows:
-                match = r.get("matches", {})
-                if not match: continue
-                
-                model_prob = float(r.get("model_probability", 0))
-                odds = float(r.get("odds", 0))
-                
-                if not odds or odds <= 1: continue
-
-                # Inline EV formula: (prob * (odds - 1)) - (1 - prob)
-                ev = (model_prob * (odds - 1)) - (1 - model_prob)
-                
-                # Only keep positive EV
-                if ev <= 0:
-                    continue
-                
-                pool.append(Selection(
-                    prediction_id=r["id"],
-                    match_id=r["match_id"],
-                    sport=match.get("sport", "unknown"),
-                    league=match.get("league", "unknown"),
-                    market=r["market"],
-                    outcome=r["predicted_outcome"],
-                    odds=odds,
-                    model_prob=model_prob,
-                    confidence=float(r.get("confidence_score", 0)),
-                    ev=ev
-                ))
-            
-            return pool
-        except Exception as exc:
-            logger.error("Failed to fetch prediction pool: %s", exc)
-            return []
-
-    def _persist_accumulator(self, acca: Accumulator):
-        """
-        Inserts the accumulator and its legs into Supabase.
-        """
-        try:
-            # 1. Insert into accumulators
-            acca_res = self.client.table("accumulators").insert({
-                "acca_type": acca.type,
-                "total_odds": acca.total_odds,
-                "status": "PENDING",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }).execute()
-
-            if not acca_res.data:
-                return
-
-            acca_id = acca_res.data[0]["id"]
-
-            # 2. Insert legs
-            legs_payload = []
-            for s in acca.selections:
-                legs_payload.append({
-                    "accumulator_id": acca_id,
-                    "prediction_id": s.prediction_id,
-                    "status": "PENDING"
-                })
-            
-            self.client.table("accumulator_legs").insert(legs_payload).execute()
-            logger.info("Persisted %s accumulator with %d legs.", acca.type, len(legs_payload))
-
-        except Exception as exc:
-            logger.error("Failed to persist accumulator %s: %s", acca.type, exc)
-
-def build_all_accumulators():
-    # Get upcoming fixtures - simple query no joins
+def get_team_form(supabase, team: str, sport: str) -> float:
     try:
-        print("Querying upcoming fixtures...")
+        result = supabase.table("matches")\
+            .select("home_team, away_team, home_score, away_score")\
+            .eq("sport", sport)\
+            .eq("status", "completed")\
+            .or_(f"home_team.eq.{team},away_team.eq.{team}")\
+            .order("match_date", desc=True)\
+            .limit(10)\
+            .execute()
+
+        matches = result.data or []
+        if not matches:
+            return 0.5
+
+        wins = 0
+        for m in matches:
+            hs = m.get("home_score") or 0
+            as_ = m.get("away_score") or 0
+            if m.get("home_team") == team and hs > as_:
+                wins += 1
+            elif m.get("away_team") == team and as_ > hs:
+                wins += 1
+
+        return wins / len(matches)
+    except Exception:
+        return 0.5
+
+
+def predict_match(
+    home_team: str,
+    away_team: str,
+    sport: str,
+    home_odds: float,
+    away_odds: float,
+    draw_odds: float = 3.0
+) -> dict:
+    supabase = get_supabase_admin()
+
+    home_wr = get_team_form(supabase, home_team, sport)
+    away_wr = get_team_form(supabase, away_team, sport)
+
+    ho = float(home_odds or 2.0)
+    ao = float(away_odds or 2.0)
+    do = float(draw_odds or 3.0)
+
+    feature = np.array([[
+        home_wr, away_wr, home_wr - away_wr,
+        10, 10,
+        ho, ao, do,
+        1 / ho, 1 / ao,
+        1 if ho < ao else 0,
+        ho / ao,
+        home_wr - 0.5,
+    ]])
+
+    model, model_name = load_best_model(sport)
+
+    if model:
+        try:
+            proba = model.predict_proba(feature)[0]
+            pred_class = int(np.argmax(proba))
+            confidence = float(max(proba))
+
+            outcomes = {1: ("Home Win", ho), 2: ("Away Win", ao), 0: ("Draw", do)}
+            outcome, odds = outcomes.get(pred_class, ("Home Win", ho))
+            model_prob = float(proba[pred_class])
+        except Exception as e:
+            print(f"Model error: {e}")
+            outcome, odds, model_prob, confidence = "Home Win", ho, home_wr, home_wr
+    else:
+        outcome, odds, model_prob, confidence = "Home Win", ho, home_wr, home_wr
+
+    implied_prob = 1 / odds
+    ev = (model_prob * (odds - 1)) - (1 - model_prob)
+    edge = (model_prob - implied_prob) * 100
+
+    return {
+        "outcome": outcome,
+        "odds": round(odds, 2),
+        "model_probability": round(model_prob, 4),
+        "implied_probability": round(implied_prob, 4),
+        "confidence": round(confidence * 100, 1),
+        "ev": round(ev, 4),
+        "edge": round(edge, 2),
+        "home_win_rate": round(home_wr, 3),
+        "away_win_rate": round(away_wr, 3),
+    }
+
+
+def generate_reasoning(
+    home_team: str,
+    away_team: str,
+    sport: str,
+    league: str,
+    pred: dict
+) -> str:
+    if not anthropic_client:
+        return (
+            f"{home_team} selected based on "
+            f"{pred['home_win_rate']:.0%} win rate. "
+            f"Edge of {pred['edge']:.1f}% over bookmaker odds."
+        )
+    try:
+        msg = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=120,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"2 sentences explaining why {pred['outcome']} "
+                    f"in {home_team} vs {away_team} ({league}) "
+                    f"is a value bet. Odds: {pred['odds']}, "
+                    f"Confidence: {pred['confidence']}%, "
+                    f"Edge: {pred['edge']}%. Be specific. No markdown."
+                )
+            }]
+        )
+        return msg.content[0].text.strip()
+    except Exception as e:
+        print(f"Reasoning error: {e}")
+        return (
+            f"{home_team} shows {pred['home_win_rate']:.0%} win rate "
+            f"with {pred['edge']:.1f}% edge over market odds."
+        )
+
+
+async def build_all_accumulators():
+    print("BUILD ACCUMULATORS STARTED")
+    supabase = get_supabase_admin()
+
+    # Simple direct query — no joins
+    try:
         result = supabase.table("matches")\
             .select("*")\
             .eq("status", "upcoming")\
             .limit(200)\
             .execute()
-        
         fixtures = result.data or []
         print(f"UPCOMING FIXTURES FOUND: {len(fixtures)}")
-        
     except Exception as e:
         print(f"Fixture fetch error: {e}")
+        return
+
+    if not fixtures:
+        print("No upcoming fixtures")
+        return
+
+    # Generate predictions
+    value_preds = []
+    for f in fixtures:
+        try:
+            home = f.get("home_team", "")
+            away = f.get("away_team", "")
+            sport = f.get("sport", "football")
+            if not home or not away:
+                continue
+
+            pred = predict_match(
+                home, away, sport,
+                f.get("home_odds", 2.0),
+                f.get("away_odds", 2.0),
+                f.get("draw_odds", 3.0)
+            )
+
+            print(f"{home} vs {away}: EV={pred['ev']:.4f}")
+
+            if pred["ev"] > 0:
+                value_preds.append({"fixture": f, "prediction": pred})
+        except Exception as e:
+            print(f"Prediction error: {e}")
+            continue
+
+    print(f"VALUE PREDICTIONS: {len(value_preds)}")
+
+    if not value_preds:
+        print("No value predictions found")
+        return
+
+    # Sort by EV
+    value_preds.sort(key=lambda x: x["prediction"]["ev"], reverse=True)
+
+    used_ids = set()
+    configs = [
+        {"type": "10odds", "target": 10.0, "max": 6, "min_conf": 55},
+        {"type": "5odds",  "target": 5.0,  "max": 4, "min_conf": 62},
+        {"type": "3odds",  "target": 3.0,  "max": 3, "min_conf": 70},
+    ]
+
+    for cfg in configs:
+        await save_accumulator(supabase, value_preds, used_ids, cfg)
+
+    print("ALL ACCUMULATORS BUILT")
+
+
+async def save_accumulator(
+    supabase, all_preds, used_ids, config
+):
+    acca_type = config["type"]
+    max_legs = config["max"]
+    min_conf = config["min_conf"]
+
+    legs = []
+    combined_odds = 1.0
+
+    for item in all_preds:
+        f = item["fixture"]
+        pred = item["prediction"]
+        fid = f.get("id")
+
+        if fid in used_ids:
+            continue
+        if pred["confidence"] < min_conf:
+            continue
+        if len(legs) >= max_legs:
+            break
+
+        reasoning = generate_reasoning(
+            f.get("home_team", ""),
+            f.get("away_team", ""),
+            f.get("sport", ""),
+            f.get("league", ""),
+            pred
+        )
+
+        legs.append({
+            "fixture": f,
+            "prediction": pred,
+            "reasoning": reasoning
+        })
+        combined_odds *= pred["odds"]
+        used_ids.add(fid)
+
+    if not legs:
+        print(f"No legs for {acca_type}")
+        return
+
+    avg_conf = sum(
+        l["prediction"]["confidence"] for l in legs
+    ) / len(legs)
+
+    try:
+        acca = supabase.table("accumulators").insert({
+            "acca_type": acca_type,
+            "total_odds": round(combined_odds, 2),
+            "status": "PENDING",
+            "ai_reasoning": (
+                f"AI selected {len(legs)} value bets "
+                f"with combined odds of {combined_odds:.2f}"
+            ),
+            "confidence_score": round(avg_conf, 1),
+            "created_at": datetime.now().isoformat()
+        }).execute()
+
+        acca_id = acca.data[0]["id"]
+        print(f"Saved {acca_type}: ID={acca_id}")
+
+        for i, leg in enumerate(legs):
+            f = leg["fixture"]
+            pred = leg["prediction"]
+
+            pred_res = supabase.table("predictions").insert({
+                "match_id": str(f.get("id")),
+                "market": "Match Result",
+                "predicted_outcome": pred["outcome"],
+                "model_probability": pred["model_probability"],
+                "implied_probability": pred["implied_probability"],
+                "edge": pred["edge"],
+                "odds": pred["odds"],
+                "confidence_score": pred["confidence"],
+                "status": "PENDING",
+                "created_at": datetime.now().isoformat()
+            }).execute()
+
+            pred_id = pred_res.data[0]["id"]
+
+            supabase.table("accumulator_legs").insert({
+                "accumulator_id": acca_id,
+                "prediction_id": str(pred_id),
+                "match_id": str(f.get("id")),
+                "sport": f.get("sport", ""),
+                "league": f.get("league", ""),
+                "home_team": f.get("home_team", ""),
+                "away_team": f.get("away_team", ""),
+                "market": "Match Result",
+                "predicted_outcome": pred["outcome"],
+                "odds": pred["odds"],
+                "confidence": pred["confidence"],
+                "edge": pred["edge"],
+                "ai_reasoning": leg["reasoning"],
+                "status": "PENDING",
+                "leg_order": i + 1,
+                "created_at": datetime.now().isoformat()
+            }).execute()
+
+    except Exception as e:
+        print(f"Save error for {acca_type}: {e}")
         import traceback
         traceback.print_exc()
-        fixtures = []
+```
+
+6. Click **Commit changes** → **Commit directly to main**
+
+---
+
+## AFTER RENDER REDEPLOYS
+```
+https://sports-predictor-1-o34s.onrender.com/admin/generate/accumulators
