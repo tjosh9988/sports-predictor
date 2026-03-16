@@ -53,47 +53,59 @@ def save_model_to_storage(
         print(f"Model storage error: {e}")
 
 def get_training_data(sport: str) -> pd.DataFrame:
-    """Fetch training data from Supabase"""
     supabase = get_supabase_admin()
-    
     print(f"Fetching {sport} training data...")
     
     all_data = []
     page_size = 10000
     offset = 0
+    max_records = 200000  # Cap at 200K to avoid memory issues
     
     while True:
         try:
             result = supabase.table("matches")\
-                .select("*")\
+                .select(
+                    "home_team, away_team, sport, "
+                    "home_score, away_score, "
+                    "home_odds, away_odds, draw_odds, "
+                    "match_date, result"
+                )\
                 .eq("sport", sport)\
                 .eq("status", "completed")\
                 .not_.is_("home_score", "null")\
                 .not_.is_("away_score", "null")\
+                .order("match_date")\
                 .range(offset, offset + page_size - 1)\
                 .execute()
             
-            if not result.data:
+            batch = result.data or []
+            
+            if not batch:
+                print(f"No more data at offset {offset}")
                 break
-                
-            all_data.extend(result.data)
+            
+            all_data.extend(batch)
             print(f"Fetched {len(all_data)} {sport} records...")
             
-            if len(result.data) < page_size:
+            if len(batch) < page_size:
+                break
+            
+            if len(all_data) >= max_records:
+                print(f"Reached max cap: {max_records}")
                 break
                 
             offset += page_size
             
         except Exception as e:
-            print(f"Data fetch error: {e}")
+            print(f"Fetch error at offset {offset}: {e}")
             break
+    
+    print(f"Total {sport} training records: {len(all_data)}")
     
     if not all_data:
         return pd.DataFrame()
     
-    df = pd.DataFrame(all_data)
-    print(f"Total {sport} training records: {len(df)}")
-    return df
+    return pd.DataFrame(all_data)
 
 def engineer_features(df: pd.DataFrame, sport: str):
     """Create features for ML model"""
