@@ -77,7 +77,15 @@ async def fetch_fixtures(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-
+@router.get("/cleanup/fake-fixtures")
+async def cleanup_fake_fixtures():
+    from app.database import get_supabase_admin
+    supabase = get_supabase_admin()
+    result = supabase.table("matches")\
+        .delete()\
+        .eq("status", "upcoming")\
+        .execute()
+    return {"deleted": "all upcoming fixtures"}
 
 @router.get("/train/status")
 async def get_training_status():
