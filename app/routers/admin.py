@@ -244,3 +244,19 @@ async def generate_accumulators(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@router.get("/debug/fixtures")
+async def debug_fixtures():
+    from app.database import get_supabase_admin
+    supabase = get_supabase_admin()
+    total = supabase.table("matches").select("id", count="exact").execute()
+    upcoming = supabase.table("matches").select("id", count="exact").eq("status", "upcoming").execute()
+    completed = supabase.table("matches").select("id", count="exact").eq("status", "completed").execute()
+    sample = supabase.table("matches").select("id,sport,home_team,away_team,status,match_date").eq("status","upcoming").limit(3).execute()
+    return {"total": total.count, "upcoming": upcoming.count, "completed": completed.count, "sample": sample.data}
+
+@router.get("/create/fixtures")
+async def create_fixtures(background_tasks: BackgroundTasks):
+    from app.ingestion.fixture_fetcher import create_upcoming_fixtures_from_history
+    background_tasks.add_task(create_upcoming_fixtures_from_history)
+    return {"status": "started", "message": "Creating upcoming fixtures from historical teams"}
