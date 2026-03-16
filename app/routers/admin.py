@@ -228,3 +228,19 @@ async def full_health():
     health["anthropic"] = "configured" if anthro_key else "missing"
     
     return {"status": "ok", "services": health}
+
+@router.get("/generate/accumulators")
+async def generate_accumulators(
+    background_tasks: BackgroundTasks
+):
+    try:
+        from app.services.accumulator_builder import (
+            build_all_accumulators
+        )
+        background_tasks.add_task(build_all_accumulators)
+        return {
+            "status": "started",
+            "message": "Building real accumulators"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
