@@ -269,8 +269,23 @@ class AccumulatorBuilder:
             logger.error("Failed to persist accumulator %s: %s", acca.type, exc)
 
 def build_all_accumulators():
-    """
-    Convenience entry point for the three-pass accumulator builder.
-    """
-    builder = AccumulatorBuilder()
-    return builder.run()
+    # Get upcoming fixtures - simple query no joins
+    try:
+        result = supabase.table("matches")\
+            .select(
+                "id, sport, league, home_team, "
+                "away_team, match_date, status, "
+                "home_odds, away_odds, draw_odds"
+            )\
+            .eq("status", "upcoming")\
+            .gte("match_date", datetime.now().isoformat())\
+            .order("match_date")\
+            .limit(200)\
+            .execute()
+        
+        fixtures = result.data or []
+        print(f"UPCOMING FIXTURES FOUND: {len(fixtures)}")
+        
+    except Exception as e:
+        print(f"Fixture fetch error: {e}")
+        fixtures = []
