@@ -6,8 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import predictions, results, sports, users, admin
 from app.config import settings
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 app = FastAPI(title="Sports Predictor API")
+scheduler = AsyncIOScheduler()
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +60,24 @@ async def keep_alive_ping():
             print(f"Keep-alive failed: {e}")
         
         await asyncio.sleep(600)  # Ping every 10 minutes
+
+@app.on_event("startup")
+async def start_scheduler():
+    scheduler.add_job(
+        daily_predictions,
+        'cron',
+        hour=7,
+        minute=0
+    )
+    scheduler.start()
+
+async def daily_predictions():
+    print("Running daily prediction generation...")
+    from app.ingestion.fixture_fetcher import fetch_all_fixtures
+    from app.services.accumulator_builder import build_all_accumulators
+    await fetch_all_fixtures()
+    await build_all_accumulators()
+    print("Daily predictions complete")
 
 app.include_router(predictions.router)
 app.include_router(results.router)
