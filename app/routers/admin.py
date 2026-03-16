@@ -318,3 +318,58 @@ async def debug_api_sports():
     
     results["key_preview"] = api_key[:8] + "..." if api_key else "MISSING"
     return results
+
+@router.get("/generate/accumulators/debug")
+async def generate_accumulators_debug():
+    """Run accumulator generation synchronously for debugging"""
+    from app.database import get_supabase_admin
+    import os, numpy as np
+    
+    results = {}
+    supabase = get_supabase_admin()
+    
+    # Step 1 - Check fixtures
+    fixtures = supabase.table("matches")\
+        .select("*")\
+        .eq("status", "upcoming")\
+        .limit(10)\
+        .execute()
+    results["fixtures_found"] = len(fixtures.data or [])
+    
+    if not fixtures.data:
+        return {"error": "No upcoming fixtures", **results}
+    
+    results["first_fixture"] = fixtures.data[0]
+    
+    # Step 2 - Check models exist
+    import glob
+    models = glob.glob("/tmp/models/*.pkl")
+    results["models_found"] = len(models)
+    results["model_files"] = models
+    
+    # Step 3 - Try prediction
+    try:
+        from app.ml.training_pipeline import predict_match
+        f = fixtures.data[0]
+        pred = predict_match(
+            f.get("home_team",""),
+            f.get("away_team",""),
+            f.get("sport","football"),
+            f.get("home_odds", 2.0),
+            f.get("away_odds", 2.0),
+            f.get("draw_odds", 3.0)
+        )
+        results["prediction_test"] = pred
+    except Exception as e:
+        results["prediction_error"] = str(e)
+    
+    # Step 4 - Check accumulator builder import
+    try:
+        from app.services.accumulator_builder import (
+            build_all_accumulators
+        )
+        results["builder_import"] = "success"
+    except Exception as e:
+        results["builder_import_error"] = str(e)
+    
+    return results
