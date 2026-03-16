@@ -4,13 +4,17 @@ accumulator_builder.py — Three-pass selection algorithm for betting accumulato
 
 from __future__ import annotations
 
+import os
 import logging
 from dataclasses import dataclass
+import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import List, Set, Dict, Any, Optional
 
-from app.ev_calculator import EVCalculator, MarketOdds
 from app.database import get_supabase_admin
+# from anthropic import Anthropic  
+# from app.ml.predictor import predict_match  
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +41,6 @@ class Accumulator:
 class AccumulatorBuilder:
     def __init__(self, supabase_client=None):
         self.client = supabase_client or get_supabase_admin()
-        self.ev_calc = EVCalculator()
         self.used_match_ids: Set[int] = set()
 
     def run(self) -> Dict[str, Optional[Accumulator]]:
@@ -203,37 +206,29 @@ class AccumulatorBuilder:
                 match = r.get("matches", {})
                 if not match: continue
                 
-                # Market odds for overround removal
-                raw_oh = r.get("odds_history", [{}])[0] if r.get("odds_history") else {}
-                m_odds = MarketOdds(
-                    home=raw_oh.get("closing_home", 0),
-                    draw=raw_oh.get("closing_draw"),
-                    away=raw_oh.get("closing_away")
-                )
+                model_prob = float(r.get("model_probability", 0))
+                odds = float(r.get("odds", 0))
                 
-                # Check if we have valid odds for the event
-                if not m_odds.home: continue
+                if not odds or odds <= 1: continue
 
-                # Calculate EV (only keep positive ones)
-                model_probs = {r["predicted_outcome"]: float(r["model_probability"])}
-                ev_results = self.ev_calc.get_value_selections(model_probs, m_odds)
+                # Inline EV formula: (prob * (odds - 1)) - (1 - prob)
+                ev = (model_prob * (odds - 1)) - (1 - model_prob)
                 
-                if not ev_results:
+                # Only keep positive EV
+                if ev <= 0:
                     continue
                 
-                ev_item = ev_results[0] # Take the best (or only) value selection
-
                 pool.append(Selection(
                     prediction_id=r["id"],
                     match_id=r["match_id"],
                     sport=match.get("sport", {}).get("slug", "unknown"),
                     league=match.get("league", {}).get("name", "unknown"),
                     market=r["market"],
-                    outcome=ev_item.selection,
-                    odds=ev_item.odds,
-                    model_prob=ev_item.model_prob,
+                    outcome=r["predicted_outcome"],
+                    odds=odds,
+                    model_prob=model_prob,
                     confidence=float(r.get("confidence_score", 0)),
-                    ev=ev_item.ev
+                    ev=ev
                 ))
             
             return pool
@@ -273,3 +268,10 @@ class AccumulatorBuilder:
 
         except Exception as exc:
             logger.error("Failed to persist accumulator %s: %s", acca.type, exc)
+
+def build_all_accumulators():
+    """
+    Convenience entry point for the three-pass accumulator builder.
+    """
+    builder = AccumulatorBuilder()
+    return builder.run()
