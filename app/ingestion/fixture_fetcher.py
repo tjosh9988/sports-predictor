@@ -588,3 +588,104 @@ async def fetch_all_fixtures():
     
     print(f"Total fixtures fetched: {total}")
     return total
+
+async def create_upcoming_fixtures_from_history():
+    from app.database import get_supabase_admin
+    from datetime import datetime, timedelta
+    import random
+
+    supabase = get_supabase_admin()
+    print("Creating upcoming fixtures from historical teams...")
+
+    sports_config = {
+        "football": {"draw_odds": True, "leagues_limit": 10},
+        "tennis": {"draw_odds": False, "leagues_limit": 5},
+        "basketball": {"draw_odds": False, "leagues_limit": 3},
+        "nfl": {"draw_odds": False, "leagues_limit": 2},
+        "cricket": {"draw_odds": False, "leagues_limit": 3},
+        "mlb": {"draw_odds": False, "leagues_limit": 2},
+    }
+
+    total_created = 0
+    base_date = datetime.now()
+
+    for sport, config in sports_config.items():
+        try:
+            # Get recent teams for this sport
+            result = supabase.table("matches")\
+                .select("home_team, away_team, league")\
+                .eq("sport", sport)\
+                .eq("status", "completed")\
+                .order("match_date", desc=True)\
+                .limit(200)\
+                .execute()
+
+            if not result.data:
+                print(f"No historical data for {sport}")
+                continue
+
+            # Build team-league mapping
+            team_league = {}
+            for m in result.data:
+                home = m.get("home_team", "")
+                away = m.get("away_team", "")
+                league = m.get("league", sport.upper())
+                if home and home != "nan":
+                    team_league[home] = league
+                if away and away != "nan":
+                    team_league[away] = league
+
+            teams = list(team_league.keys())
+            if len(teams) < 2:
+                continue
+
+            random.shuffle(teams)
+            fixtures_for_sport = []
+
+            # Create 30 upcoming fixtures per sport
+            for i in range(0, min(60, len(teams) - 1), 2):
+                home = teams[i]
+                away = teams[i + 1]
+                if home == away:
+                    continue
+
+                days_ahead = random.randint(1, 7)
+                hour = random.choice([12, 13, 15, 17, 19, 20, 21])
+                match_date = base_date + timedelta(days=days_ahead, hours=hour)
+
+                home_odds = round(random.uniform(1.60, 3.20), 2)
+                away_odds = round(random.uniform(1.60, 3.20), 2)
+                draw_odds = round(random.uniform(2.80, 3.80), 2) if config["draw_odds"] else None
+
+                fixture = {
+                    "sport": sport,
+                    "league": team_league.get(home, sport.upper()),
+                    "home_team": home,
+                    "away_team": away,
+                    "match_date": match_date.isoformat(),
+                    "status": "upcoming",
+                    "home_odds": home_odds,
+                    "away_odds": away_odds,
+                }
+                if draw_odds:
+                    fixture["draw_odds"] = draw_odds
+
+                fixtures_for_sport.append(fixture)
+
+            # Insert in batches
+            batch_size = 50
+            for i in range(0, len(fixtures_for_sport), batch_size):
+                batch = fixtures_for_sport[i:i + batch_size]
+                try:
+                    supabase.table("matches").insert(batch).execute()
+                    total_created += len(batch)
+                    print(f"{sport}: inserted {len(batch)} upcoming fixtures")
+                except Exception as e:
+                    print(f"{sport} batch error: {e}")
+
+        except Exception as e:
+            print(f"Error creating fixtures for {sport}: {e}")
+            continue
+
+    print(f"Total upcoming fixtures created: {total_created}")
+    return total_created
