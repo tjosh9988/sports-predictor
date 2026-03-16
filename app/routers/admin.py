@@ -87,6 +87,35 @@ async def cleanup_fake_fixtures():
         .execute()
     return {"deleted": "all upcoming fixtures"}
 
+@router.get("/cleanup/old-accumulators")
+async def cleanup_old_accumulators():
+    from app.database import get_supabase_admin
+    from datetime import datetime, timedelta
+    supabase = get_supabase_admin()
+    
+    # Keep only today's accumulators
+    today = datetime.now().date().isoformat()
+    
+    # Delete legs first (foreign key)
+    supabase.table("accumulator_legs")\
+        .delete()\
+        .lt("created_at", f"{today}T00:00:00")\
+        .execute()
+    
+    # Delete predictions
+    supabase.table("predictions")\
+        .delete()\
+        .lt("created_at", f"{today}T00:00:00")\
+        .execute()
+    
+    # Delete old accumulators
+    result = supabase.table("accumulators")\
+        .delete()\
+        .lt("created_at", f"{today}T00:00:00")\
+        .execute()
+    
+    return {"status": "cleaned", "message": "Old accumulators removed"}
+
 @router.get("/train/status")
 async def get_training_status():
     from app.database import get_supabase_admin

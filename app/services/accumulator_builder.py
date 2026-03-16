@@ -354,16 +354,25 @@ async def save_accumulator(
 
     legs = []
     combined_odds = 1.0
+    local_match_ids = set()  # Track per accumulator
 
     for item in all_preds:
         f = item["fixture"]
         pred = item["prediction"]
         fid = f.get("id")
+        match_key = f"{f.get('home_team')}_{f.get('away_team')}"
 
         if fid in used_ids:
             continue
+        
+        if match_key in local_match_ids:  # No same match twice
+            continue
 
         if pred["confidence"] < min_conf:
+            continue
+
+        # Target odds filter: skip if would exceed target by 30%
+        if combined_odds * pred["odds"] > config["target"] * 1.3:
             continue
 
         if len(legs) >= max_legs:
@@ -385,6 +394,7 @@ async def save_accumulator(
 
         combined_odds *= pred["odds"]
         used_ids.add(fid)
+        local_match_ids.add(match_key)
 
     if not legs:
         print(f"No legs found for {acca_type}")

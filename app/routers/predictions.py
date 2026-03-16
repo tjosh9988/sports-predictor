@@ -37,8 +37,18 @@ async def get_today_accumulators():
             .order("created_at", desc=True)
             .execute()
         )
+        
         if res.data:
-            return {"data": res.data, "count": len(res.data), "source": "database"}
+            # Filter to one per type
+            seen_types = set()
+            filtered = []
+            for acca in res.data:
+                acca_type = acca.get("acca_type")
+                if acca_type not in seen_types:
+                    filtered.append(acca)
+                    seen_types.add(acca_type)
+            
+            return {"data": filtered, "count": len(filtered), "source": "database"}
             
         # Mock data if empty
         return {
