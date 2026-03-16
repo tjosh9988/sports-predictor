@@ -271,15 +271,10 @@ class AccumulatorBuilder:
 def build_all_accumulators():
     # Get upcoming fixtures - simple query no joins
     try:
+        print("Querying upcoming fixtures...")
         result = supabase.table("matches")\
-            .select(
-                "id, sport, league, home_team, "
-                "away_team, match_date, status, "
-                "home_odds, away_odds, draw_odds"
-            )\
+            .select("*")\
             .eq("status", "upcoming")\
-            .gte("match_date", datetime.now().isoformat())\
-            .order("match_date")\
             .limit(200)\
             .execute()
         
@@ -288,4 +283,6 @@ def build_all_accumulators():
         
     except Exception as e:
         print(f"Fixture fetch error: {e}")
+        import traceback
+        traceback.print_exc()
         fixtures = []
