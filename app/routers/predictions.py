@@ -96,7 +96,7 @@ async def get_today_accumulators():
         logger.error("Error fetching today's accumulators: %s", exc)
         return {"data": [], "count": 0, "error": str(exc)}
 
-@router.get("/accumulators/{acca_type}", response_model=List[AccumulatorOut])
+@router.get("/accumulators/{acca_type}")
 async def get_accumulators_by_type(acca_type: str):
     """
     Fetch all accumulators of a specific type (3odds, 5odds, 10odds).
@@ -120,7 +120,7 @@ async def get_accumulators_by_type(acca_type: str):
         logger.error("Error fetching %s accumulators: %s", acca_type, exc)
         raise HTTPException(status_code=500, detail=f"Failed to fetch {acca_type} accumulators.")
 
-@router.get("/fixtures/{sport}", response_model=List[MatchOut])
+@router.get("/fixtures/{sport}")
 async def get_sport_fixtures(sport: str):
     """
     Fetch upcoming fixtures for a specific sport.
@@ -146,7 +146,7 @@ async def get_sport_fixtures(sport: str):
         logger.error("Error fetching fixtures for %s: %s", sport, exc)
         raise HTTPException(status_code=500, detail="Failed to fetch fixtures.")
 
-@router.get("/match/{match_id}", response_model=dict)
+@router.get("/match/{match_id}")
 async def get_match_prediction(match_id: int):
     """
     Fetch a specific match and all its associated predictions.
