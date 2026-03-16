@@ -147,13 +147,25 @@ async def get_training_status():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+SPORT_ALIASES = {
+    "nba": "basketball",
+    "basketball": "basketball",
+    "tennis": "tennis",
+    "football": "football",
+    "mlb": "mlb",
+    "nfl": "nfl",
+    "cricket": "cricket",
+    "nhl": "nhl",
+}
+
 @router.get("/train/{sport}")
 async def trigger_training(
     sport: str,
     background_tasks: BackgroundTasks
 ):
     try:
-        if sport == "all":
+        mapped_sport = SPORT_ALIASES.get(sport, sport)
+        if mapped_sport == "all":
             from app.ml.training_pipeline import (
                 train_all_models
             )
@@ -163,12 +175,12 @@ async def trigger_training(
                 train_sport_models
             )
             background_tasks.add_task(
-                train_sport_models, sport
+                train_sport_models, mapped_sport
             )
         return {
             "status": "started",
-            "sport": sport,
-            "message": f"Training {sport} models"
+            "sport": mapped_sport,
+            "message": f"Training {mapped_sport} models"
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

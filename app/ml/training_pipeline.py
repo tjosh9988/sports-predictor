@@ -92,8 +92,6 @@ def get_training_data(sport: str) -> pd.DataFrame:
                 )\
                 .eq("sport", active_sport)\
                 .eq("status", "completed")\
-                .not_.is_("home_score", "null")\
-                .not_.is_("away_score", "null")\
                 .range(offset, offset + page_size - 1)\
                 .execute()
             
