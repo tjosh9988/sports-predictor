@@ -39,6 +39,7 @@ celery==5.4.0
 
 # NLP & Sentiment
 anthropic==0.34.2
+google-generativeai==0.8.3
 newsapi-python==0.2.7
 beautifulsoup4==4.12.3
 

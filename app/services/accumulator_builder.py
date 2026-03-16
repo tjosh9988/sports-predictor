@@ -8,7 +8,7 @@ import pandas as pd
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Set, Dict, Any, Optional
-from anthropic import Anthropic
+import google.generativeai as genai
 from app.database import get_supabase_admin
 
 logger = logging.getLogger(__name__)
@@ -16,12 +16,9 @@ logger = logging.getLogger(__name__)
 MODELS_DIR = "/tmp/models"
 _model_cache = {}
 
-try:
-    anthropic_client = Anthropic(
-        api_key=os.getenv("ANTHROPIC_API_KEY", "")
-    )
-except Exception:
-    anthropic_client = None
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", "AIzaSyBKsnwEqAfhelkv9ZEaQ1tq7HFB1rndfF0"))
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 def load_best_model(sport: str):
     global _model_cache
@@ -216,34 +213,20 @@ def generate_reasoning(
     league: str,
     pred: dict
 ) -> str:
-    if not anthropic_client:
-        return (
-            f"{home_team} selected based on "
-            f"{pred['home_win_rate']:.0%} win rate. "
-            f"Edge of {pred['edge']:.1f}% over bookmaker odds."
-        )
     try:
-        msg = anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=120,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"2 sentences explaining why {pred['outcome']} "
-                    f"in {home_team} vs {away_team} ({league}) "
-                    f"is a value bet. Odds: {pred['odds']}, "
-                    f"Confidence: {pred['confidence']}%, "
-                    f"Edge: {pred['edge']}%. "
-                    f"Be specific. No markdown."
-                )
-            }]
+        response = gemini_model.generate_content(
+            f"2 sentences explaining why {pred['outcome']} "
+            f"in {home_team} vs {away_team} ({league}) "
+            f"is a value bet. Odds: {pred['odds']}, "
+            f"Confidence: {pred['confidence']}%, "
+            f"Edge: {pred['edge']}%. No markdown."
         )
-        return msg.content[0].text.strip()
+        return response.text.strip()
     except Exception as e:
         print(f"Reasoning error: {e}")
         return (
-            f"{home_team} shows {pred['home_win_rate']:.0%} win rate "
-            f"with {pred['edge']:.1f}% edge over market odds."
+            f"{home_team} shows {pred['home_win_rate']:.0%} "
+            f"win rate with {pred['edge']:.1f}% edge over market."
         )
 
 
