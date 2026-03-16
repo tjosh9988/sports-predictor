@@ -54,53 +54,68 @@ def save_model_to_storage(
 
 def get_training_data(sport: str) -> pd.DataFrame:
     supabase = get_supabase_admin()
-    print(f"Fetching {sport} training data...")
+    
+    # Try primary name first
+    sport_variants = SPORT_NAME_MAP.get(sport, [sport])
+    
+    # Find which variant has data
+    active_sport = sport
+    for variant in sport_variants:
+        try:
+            test = supabase.table("matches")\
+                .select("sport", count="exact")\
+                .eq("sport", variant)\
+                .eq("status", "completed")\
+                .limit(1)\
+                .execute()
+            if test.count and test.count > 0:
+                active_sport = variant
+                print(f"Using sport name: {variant} for {sport}")
+                break
+        except:
+            continue
+    
+    print(f"Fetching {active_sport} training data...")
     
     all_data = []
-    page_size = 10000
+    page_size = 5000
     offset = 0
-    max_records = 200000  # Cap at 200K to avoid memory issues
+    max_records = 100000
     
-    while True:
+    while len(all_data) < max_records:
         try:
             result = supabase.table("matches")\
                 .select(
                     "home_team, away_team, sport, "
                     "home_score, away_score, "
-                    "home_odds, away_odds, draw_odds, "
-                    "match_date, result"
+                    "home_odds, away_odds, draw_odds"
                 )\
-                .eq("sport", sport)\
+                .eq("sport", active_sport)\
                 .eq("status", "completed")\
                 .not_.is_("home_score", "null")\
                 .not_.is_("away_score", "null")\
-                .order("match_date")\
                 .range(offset, offset + page_size - 1)\
                 .execute()
             
             batch = result.data or []
-            
             if not batch:
-                print(f"No more data at offset {offset}")
                 break
             
             all_data.extend(batch)
-            print(f"Fetched {len(all_data)} {sport} records...")
+            print(f"Fetched {len(all_data)} {active_sport} records...")
             
             if len(batch) < page_size:
                 break
             
-            if len(all_data) >= max_records:
-                print(f"Reached max cap: {max_records}")
-                break
-                
             offset += page_size
             
         except Exception as e:
             print(f"Fetch error at offset {offset}: {e}")
+            if all_data:
+                print(f"Using {len(all_data)} records despite error")
             break
     
-    print(f"Total {sport} training records: {len(all_data)}")
+    print(f"Total {active_sport} training records: {len(all_data)}")
     
     if not all_data:
         return pd.DataFrame()
