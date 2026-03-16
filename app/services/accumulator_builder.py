@@ -191,8 +191,7 @@ class AccumulatorBuilder:
                 .select(
                     "id, match_id, market, predicted_outcome, "
                     "model_probability, odds, confidence_score, "
-                    "matches(match_date, sport, league), "
-                    "odds_history(closing_home, closing_draw, closing_away)"
+                    "matches(match_date, sport, league)"
                 )
                 .gte("matches.match_date", now.isoformat())
                 .lte("matches.match_date", future.isoformat())
