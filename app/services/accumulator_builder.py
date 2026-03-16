@@ -328,7 +328,7 @@ async def save_accumulator(
         traceback.print_exc()
 ```
 
-6. Click **Commit changes** → **Commit directly to main**
+6. Click **Commit changes** **  Commit directly to main**
 
 ---
 
