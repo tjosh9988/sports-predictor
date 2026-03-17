@@ -36,16 +36,14 @@ class AccumulatorLegModel {
   });
 
   factory AccumulatorLegModel.fromJson(Map<String, dynamic> json) {
-    print('Leg: ${json['home_team']} vs ${json['away_team']}');
-    
     return AccumulatorLegModel(
       id: json['id']?.toString() ?? '',
-      accumulatorId: int.tryParse(json['accumulator_id']?.toString() ?? '0') ?? 0,
-      matchId: json['match_id'] != null ? int.tryParse(json['match_id'].toString()) : null,
-      sport: json['sport']?.toString() ?? '',
-      league: json['league']?.toString() ?? '',
+      accumulatorId: (json['accumulator_id'] as num?)?.toInt() ?? 0,
+      matchId: (json['match_id'] as num?)?.toInt(),
       homeTeam: json['home_team']?.toString() ?? 'Unknown',
       awayTeam: json['away_team']?.toString() ?? 'Unknown',
+      league: json['league']?.toString() ?? '',
+      sport: json['sport']?.toString() ?? '',
       market: json['market']?.toString() ?? 'Match Result',
       predictedOutcome: json['predicted_outcome']?.toString() ?? '',
       odds: (json['odds'] as num?)?.toDouble() ?? 0.0,
@@ -53,7 +51,6 @@ class AccumulatorLegModel {
       edge: (json['edge'] as num?)?.toDouble() ?? 0.0,
       aiReasoning: json['ai_reasoning']?.toString() ?? '',
       status: json['status']?.toString() ?? 'PENDING',
-      actualOutcome: json['actual_outcome']?.toString(),
       legOrder: (json['leg_order'] as num?)?.toInt() ?? 0,
     );
   }

@@ -8,16 +8,19 @@ class AccumulatorRepository {
 
   AccumulatorRepository(this._api);
 
+  List<dynamic> _parseList(dynamic responseData) {
+    if (responseData is Map<String, dynamic>) {
+      return responseData['data'] as List<dynamic>? ?? [];
+    } else if (responseData is List) {
+      return responseData as List<dynamic>;
+    }
+    return [];
+  }
+
   Future<List<AccumulatorModel>> getTodayAccumulators() async {
     try {
       final response = await _api.dio.get('/predictions/accumulators/today');
-      
-      List<dynamic> accaList = [];
-      if (response.data is Map<String, dynamic>) {
-        accaList = response.data['data'] as List? ?? [];
-      } else if (response.data is List) {
-        accaList = response.data as List;
-      }
+      final List<dynamic> accaList = _parseList(response.data);
       
       print('Today accumulators: ${accaList.length}');
 
@@ -37,13 +40,7 @@ class AccumulatorRepository {
   Future<AccumulatorModel?> getAccumulatorByType(AccaType type) async {
     try {
       final response = await _api.dio.get('/predictions/accumulators/${type.value}');
-      
-      List<dynamic> accaList = [];
-      if (response.data is Map<String, dynamic>) {
-        accaList = response.data['data'] as List? ?? [];
-      } else if (response.data is List) {
-        accaList = response.data as List;
-      }
+      final List<dynamic> accaList = _parseList(response.data);
       
       print('Accumulators for ${type.value}: ${accaList.length}');
       
@@ -65,16 +62,17 @@ class AccumulatorRepository {
     int limit = 20,
   }) async {
     try {
-      final response = await _api.get(
-        '/predictions/history', 
+      final response = await _api.dio.get(
+        '/results/history', 
         queryParameters: {'page': page, 'limit': limit},
       );
-      final List data = (response.data is Map ? response.data['data'] : response.data) ?? [];
-      return data.map((json) => AccumulatorModel.fromJson(json)).toList();
+      final List<dynamic> data = _parseList(response.data);
+      return data.map((json) => AccumulatorModel.fromJson(json as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return [];
       rethrow;
     } catch (e) {
+      print('getAccumulatorHistory error: $e');
       return [];
     }
   }
