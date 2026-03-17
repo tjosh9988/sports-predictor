@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme.dart';
 
+import '../../../data/models/fixture_model.dart';
+import '../../../data/models/prediction_model.dart';
 import '../../providers/fixture_provider.dart';
 import '../../widgets/fixtures/form_badge.dart';
-import '../../widgets/fixtures/probability_bar.dart';
 import '../../widgets/fixtures/stat_comparison_row.dart';
 
 
@@ -159,16 +160,26 @@ class FixtureDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPredictionsTab(dynamic fixture) {
+  Widget _buildPredictionsTab(FixtureModel fixture) {
+    final predictions = fixture.predictions ?? [];
+    
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const Text('AI MARKET BREAKDOWN', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        const ProbabilityBar(label: 'Home Win', probability: 0.65, modelOdds: 1.54, bookmakerOdds: 1.80),
-        const ProbabilityBar(label: 'Over 2.5 Goals', probability: 0.72, modelOdds: 1.39, bookmakerOdds: 1.65),
-        const ProbabilityBar(label: 'BTTS - Yes', probability: 0.58, modelOdds: 1.72, bookmakerOdds: 1.95),
-        const ProbabilityBar(label: 'Away Win', probability: 0.15, modelOdds: 6.67, bookmakerOdds: 5.50),
+        if (predictions.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Text(
+                'No detailed predictions available yet.',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+          )
+        else
+          ...predictions.map((p) => _buildPredictionCard(p)),
         const SizedBox(height: 32),
         if (fixture.predictionId != null)
           Container(
@@ -182,6 +193,102 @@ class FixtureDetailScreen extends ConsumerWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildPredictionCard(PredictionModel p) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.secondaryBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                p.market,
+                style: const TextStyle(color: AppTheme.primaryGold, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  p.odds.toStringAsFixed(2),
+                  style: const TextStyle(color: AppTheme.primaryGold, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            p.predictedOutcome,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailConfidenceBar(p.confidenceScore),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Edge: +${p.edge.toStringAsFixed(1)}%',
+                style: const TextStyle(color: AppTheme.successGreen, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Status: ${p.status.toUpperCase()}',
+                style: TextStyle(
+                  color: p.status == 'won' ? AppTheme.successGreen : (p.status == 'lost' ? AppTheme.dangerRed : AppTheme.textSecondary),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          if (p.aiReasoning != null && p.aiReasoning!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white10),
+            const SizedBox(height: 8),
+            Text(
+              p.aiReasoning!,
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailConfidenceBar(double confidence) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Confidence', style: TextStyle(color: AppTheme.textSecondary, fontSize: 10)),
+            Text('${confidence.toInt()}%', style: const TextStyle(color: AppTheme.textPrimary, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: confidence / 100,
+            backgroundColor: Colors.white.withOpacity(0.05),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              confidence >= 70 ? AppTheme.successGreen : (confidence >= 55 ? AppTheme.primaryGold : Colors.orange),
+            ),
+            minHeight: 4,
+          ),
+        ),
       ],
     );
   }

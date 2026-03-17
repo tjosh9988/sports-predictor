@@ -1,3 +1,5 @@
+import 'prediction_model.dart';
+
 class FixtureModel {
   final String id;
   final String sport;
@@ -14,6 +16,7 @@ class FixtureModel {
   final int? awayScore;
   final String? venue;
   final String? round;
+  final List<PredictionModel>? predictions;
 
   FixtureModel({
     required this.id,
@@ -31,6 +34,7 @@ class FixtureModel {
     this.awayScore,
     this.venue,
     this.round,
+    this.predictions,
   });
 
   factory FixtureModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +56,11 @@ class FixtureModel {
       awayScore: json['away_score'],
       venue: json['venue'] ?? '',
       round: json['round'] ?? '',
+      predictions: json['predictions'] != null
+          ? (json['predictions'] as List)
+              .map((p) => PredictionModel.fromJson(p as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 }

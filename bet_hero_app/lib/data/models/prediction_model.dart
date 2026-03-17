@@ -11,6 +11,7 @@ class PredictionModel {
   final String status;
   final String? actualOutcome;
   final String? result; // Alias for actualOutcome/status in UI
+  final String? aiReasoning;
   final DateTime matchDate;
   final DateTime createdAt;
 
@@ -27,6 +28,7 @@ class PredictionModel {
     required this.status,
     this.actualOutcome,
     this.result,
+    this.aiReasoning,
     required this.matchDate,
     required this.createdAt,
   });
@@ -45,6 +47,7 @@ class PredictionModel {
       status: json['status'] ?? 'pending',
       actualOutcome: json['actual_outcome'],
       result: json['result'] ?? json['actual_outcome'],
+      aiReasoning: json['ai_reasoning'],
       matchDate: json['match_date'] != null 
           ? DateTime.parse(json['match_date']) 
           : DateTime.now(), // Fallback to now if missing

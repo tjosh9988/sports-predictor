@@ -124,44 +124,50 @@ class DashboardScreen extends ConsumerWidget {
         final featured = accas.isEmpty 
             ? _emptyAcca(AccaType.ten)
             : accas.firstWhere((a) => a.type == AccaType.ten, orElse: () => accas.first);
-        return Container(
-          decoration: BoxDecoration(
-            color: AppTheme.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border(
-              bottom: BorderSide(
-                color: Colors.white.withValues(alpha: 0.05),
-                width: 1.0,
-              ),
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('10 ODDS COMBO', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('${featured.totalOdds.toStringAsFixed(2)} ODDS', style: const TextStyle(color: AppTheme.primaryGold, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              ...featured.legs.take(3).map((leg) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: LegCard(leg: leg),
-              )),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => context.push('/accumulator/${featured.type.value}?index=10'),
-                    child: const Text('View Full Analysis'),
+        return Hero(
+          tag: 'acca_${featured.id}_10',
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppTheme.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    width: 1.0,
                   ),
                 ),
               ),
-            ],
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('10 ODDS COMBO', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('${featured.totalOdds.toStringAsFixed(2)} ODDS', style: const TextStyle(color: AppTheme.primaryGold, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  ...featured.legs.take(3).map((leg) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: LegCard(leg: leg),
+                  )),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => context.push('/accumulator/${featured.type.value}?index=10'),
+                        child: const Text('View Full Analysis'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },

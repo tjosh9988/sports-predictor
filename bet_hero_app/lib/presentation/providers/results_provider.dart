@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/di.dart';
-import '../../data/models/prediction_model.dart';
+import '../../data/models/accumulator_model.dart';
 import '../../data/models/performance_model.dart';
 
 // Provider for overall performance statistics
@@ -19,16 +19,16 @@ final accuracyBySportProvider = FutureProvider.family<Map<String, double>, Strin
   return await repo.getAccuracyBySport(sport);
 });
 
-// AsyncNotifier for paginated prediction history
-class PredictionHistoryNotifier extends AsyncNotifier<List<PredictionModel>> {
+// AsyncNotifier for paginated accumulator history
+class AccumulatorHistoryNotifier extends AsyncNotifier<List<AccumulatorModel>> {
   int _currentPage = 1;
   bool _hasMore = true;
 
   @override
-  Future<List<PredictionModel>> build() async {
+  Future<List<AccumulatorModel>> build() async {
     _currentPage = 1;
     _hasMore = true;
-    return await ref.read(resultsRepositoryProvider).getPredictionHistory(page: 1);
+    return await ref.read(resultsRepositoryProvider).getAccumulatorHistory(page: 1);
   }
 
   Future<void> fetchNextPage() async {
@@ -37,7 +37,7 @@ class PredictionHistoryNotifier extends AsyncNotifier<List<PredictionModel>> {
     final currentList = state.value ?? [];
     _currentPage++;
     
-    final nextPage = await ref.read(resultsRepositoryProvider).getPredictionHistory(page: _currentPage);
+    final nextPage = await ref.read(resultsRepositoryProvider).getAccumulatorHistory(page: _currentPage);
     if (nextPage.isEmpty) {
       _hasMore = false;
     } else {
@@ -46,6 +46,6 @@ class PredictionHistoryNotifier extends AsyncNotifier<List<PredictionModel>> {
   }
 }
 
-final predictionHistoryProvider = AsyncNotifierProvider<PredictionHistoryNotifier, List<PredictionModel>>(
-  () => PredictionHistoryNotifier(),
+final accumulatorHistoryProvider = AsyncNotifierProvider<AccumulatorHistoryNotifier, List<AccumulatorModel>>(
+  () => AccumulatorHistoryNotifier(),
 );

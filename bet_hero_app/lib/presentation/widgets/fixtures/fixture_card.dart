@@ -36,10 +36,26 @@ class FixtureCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        fixture.homeTeam,
-                        textAlign: TextAlign.end,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${fixture.homeTeam} vs ${fixture.awayTeam}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            fixture.league,
+                            style: const TextStyle(
+                              color: Colors.amber,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Container(
@@ -57,12 +73,6 @@ class FixtureCard extends StatelessWidget {
                           if (fixture.status == 'LIVE')
                             const Text('LIVE', style: TextStyle(color: AppTheme.successGreen, fontSize: 8)),
                         ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        fixture.awayTeam,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                       ),
                     ),
                   ],

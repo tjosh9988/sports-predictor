@@ -59,7 +59,11 @@ class FixtureRepository {
     try {
       final response = await _api.get('/predictions/match/$id');
       if (response.data == null || response.data['match'] == null) return null;
-      return FixtureModel.fromJson(response.data['match']);
+      
+      final Map<String, dynamic> matchData = Map<String, dynamic>.from(response.data['match']);
+      matchData['predictions'] = response.data['predictions'];
+      
+      return FixtureModel.fromJson(matchData);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       rethrow;

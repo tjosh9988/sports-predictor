@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/accumulator_model.dart';
 import '../models/prediction_model.dart';
 import '../models/performance_model.dart';
 import '../../services/api_service.dart';
@@ -9,34 +10,44 @@ class ResultsRepository {
 
   ResultsRepository(this._api);
 
-  Future<List<PredictionModel>> getPredictionHistory({int page = 1}) async {
+  List<dynamic> _parseList(dynamic responseData) {
+    if (responseData is Map<String, dynamic>) {
+      return responseData['data'] as List<dynamic>? ?? [];
+    } else if (responseData is List) {
+      return responseData as List<dynamic>;
+    }
+    return [];
+  }
+
+  Future<List<AccumulatorModel>> getAccumulatorHistory({int page = 1}) async {
     try {
-      final response = await _api.get(
+      final response = await _api.dio.get(
         '/results/history',
         queryParameters: {'page': page, 'limit': 50},
       );
-      final List data = (response.data is Map ? response.data['data'] : response.data) ?? [];
-      return data.map((json) => PredictionModel.fromJson(json)).toList();
+      final List<dynamic> data = _parseList(response.data);
+      return data.map((json) => AccumulatorModel.fromJson(json as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return [];
       rethrow;
     } catch (e) {
+      print('getAccumulatorHistory error: $e');
       return [];
     }
   }
 
   Future<PerformanceModel> getPerformanceStats() async {
     try {
-      final response = await _api.get('/results/performance');
-      final List data = response.data ?? [];
-      if (data.isEmpty) {
+      final response = await _api.dio.get('/results/performance');
+      if (response.data == null) {
         return PerformanceModel.empty();
       }
-      return PerformanceModel.fromJson(data.first);
+      return PerformanceModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return PerformanceModel.empty();
       rethrow;
     } catch (e) {
+      print('getPerformanceStats error: $e');
       return PerformanceModel.empty();
     }
   }

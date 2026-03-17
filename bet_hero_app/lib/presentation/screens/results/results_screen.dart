@@ -44,10 +44,10 @@ class _HistoryTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(predictionHistoryProvider);
+    final historyAsync = ref.watch(accumulatorHistoryProvider);
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(predictionHistoryProvider),
+      onRefresh: () async => ref.invalidate(accumulatorHistoryProvider),
       child: historyAsync.when(
         data: (history) {
           if (history.isEmpty) return const Center(child: Text('No history found'));
@@ -57,10 +57,12 @@ class _HistoryTab extends ConsumerWidget {
             itemBuilder: (context, index) {
               final item = history[index];
               return AccumulatorHistoryCard(
-                date: item.matchDate.toString().substring(0, 10),
-                type: item.market,
-                odds: item.odds,
-                status: item.result ?? 'pending',
+                id: item.id,
+                index: index,
+                date: item.createdAt.toString().substring(0, 10),
+                type: item.type.value,
+                odds: item.totalOdds,
+                status: item.status.value,
                 onTap: () {},
               );
             },
@@ -86,26 +88,31 @@ class _PerformanceTab extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Expanded(child: PerformanceStatCard(label: 'Total ROI', value: '+${stats.roi.toStringAsFixed(1)}%', trend: '12% this month')),
+              Expanded(child: PerformanceStatCard(label: 'Total Bets', value: '${stats.totalPredictions}', trend: '${stats.pending} pending')),
               const SizedBox(width: 12),
-              Expanded(child: PerformanceStatCard(label: 'Win Rate', value: '${stats.winRate.toStringAsFixed(1)}%', trend: '4% increase', isPositiveTrend: true)),
+              Expanded(child: PerformanceStatCard(label: 'Win Rate', value: '${stats.winRate.toStringAsFixed(1)}%', trend: '${stats.won} wins / ${stats.lost} losses', isPositiveTrend: true)),
             ],
           ),
           const SizedBox(height: 32),
           const Text('Win Rate by Acca Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 16),
-          SizedBox(height: 200, child: _buildBarChart()),
+          SizedBox(height: 200, child: _buildBarChart(stats.byType)),
           const SizedBox(height: 32),
           const CalendarHeatmap(results: {
             1: 'won', 2: 'won', 3: 'lost', 4: 'won', 5: 'won',
             6: 'lost', 7: 'lost', 8: 'won', 10: 'won', 12: 'won',
           }),
           const SizedBox(height: 32),
-          const Text('Top Performing Sports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text('Model Performance Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 12),
-          _sportRankItem('Football', '68% WR', '+24% ROI'),
-          _sportRankItem('Basketball', '62% WR', '+18% ROI'),
-          _sportRankItem('Tennis', '58% WR', '+12% ROI'),
+          if (stats.models.isEmpty)
+            const Text('No model data available', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12))
+          else
+            ...stats.models.map((m) => _sportRankItem(
+              m.modelName, 
+              '${m.accuracy.toStringAsFixed(1)}% Acc', 
+              '${m.totalBets} bets'
+            )),
           const SizedBox(height: 100),
         ],
       ),
@@ -114,7 +121,13 @@ class _PerformanceTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildBarChart() {
+  Widget _buildBarChart(Map<String, dynamic> byType) {
+    double getVal(String key) {
+      final val = byType[key];
+      if (val is Map) return (val['win_rate'] as num? ?? 0.0).toDouble();
+      return (val as num? ?? 0.0).toDouble();
+    }
+
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
@@ -142,9 +155,9 @@ class _PerformanceTab extends ConsumerWidget {
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
         barGroups: [
-          _makeBar(0, 48, AppTheme.primaryGold),
-          _makeBar(1, 62, AppTheme.successGreen),
-          _makeBar(2, 74, AppTheme.successGreen),
+          _makeBar(0, getVal('10odds'), AppTheme.primaryGold),
+          _makeBar(1, getVal('5odds'), AppTheme.successGreen),
+          _makeBar(2, getVal('3odds'), AppTheme.successGreen),
         ],
       ),
     );
