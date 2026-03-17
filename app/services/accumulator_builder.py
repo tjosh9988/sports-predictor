@@ -345,10 +345,10 @@ async def build_all_accumulators():
         {
             "type": "10odds",
             "target": 10.0,
-            "max_legs": 10,
-            "min_legs": 7,
+            "max_legs": 8,
+            "min_legs": 6,
             "min_conf": 50,
-            "max_single_odds": 1.45,
+            "max_single_odds": 1.40,
             "min_single_odds": 1.10,
         },
         {
@@ -407,6 +407,7 @@ async def save_accumulator(
         if pred["confidence"] < min_conf:
             continue
         if len(legs) >= max_legs:
+            print(f"Reached max legs: {max_legs}")
             break
 
         # ENFORCE LOW ODDS PER LEG
@@ -463,6 +464,7 @@ async def save_accumulator(
             if match_key in local_matches:
                 continue
             if len(legs) >= max_legs:
+                print(f"Reached max legs (relaxed): {max_legs}")
                 break
 
             leg_odds = pred["odds"]
