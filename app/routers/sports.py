@@ -55,49 +55,50 @@ async def get_sport_leagues(sport: str):
 
 @router.get("/{sport}/fixtures")
 async def get_sport_fixtures(sport: str, date: str = None):
+    from app.database import get_supabase_admin
+    supabase = get_supabase_admin()
+    
     try:
-        from app.database import get_supabase_admin
-        supabase = get_supabase_admin()
+        query = supabase.table("matches")\
+            .select("*")\
+            .eq("status", "upcoming")\
+            .order("match_date")
         
-        # Handle "all" — query all sports
-        if sport == "all":
-            query = supabase.table("matches")\
-                .select("*")\
-                .eq("status", "upcoming")\
-                .order("match_date")
-        else:
-            query = supabase.table("matches")\
-                .select("*")\
-                .eq("sport", sport)\
-                .eq("status", "upcoming")\
-                .order("match_date")
+        if sport != "all":
+            query = query.eq("sport", sport)
         
         if date:
-            # Flexible date handling
-            query = query.gte("match_date", f"{date}T00:00:00Z")\
-                         .lte("match_date", f"{date}T23:59:59Z")
+            # Use date string prefix match instead of range
+            query = query.gte("match_date", f"{date}T00:00:00")\
+                         .lte("match_date", f"{date}T23:59:59+23:59")
         
-        result = query.limit(50).execute()
-        fixtures = result.data if result.data else []
+        result = query.limit(100).execute()
+        fixtures = result.data or []
         
-        # Return sample data if database is empty
-        if not fixtures:
+        if fixtures:
             return {
-                "data": get_sample_fixtures(sport),
-                "count": 4,
-                "source": "sample"
+                "data": fixtures,
+                "count": len(fixtures),
+                "source": "database"
             }
         
-        return {"data": fixtures, "count": len(fixtures), "source": "database"}
+        # Debug info
+        total = supabase.table("matches")\
+            .select("id", count="exact")\
+            .eq("status", "upcoming")\
+            .execute()
+        
+        return {
+            "data": [],
+            "count": 0,
+            "source": "empty",
+            "debug_total_upcoming": total.count if hasattr(total, 'count') else 0,
+            "date_queried": date
+        }
         
     except Exception as e:
         logger.error(f"Fixtures error: {e}")
-        return {
-            "data": get_sample_fixtures(sport),
-            "count": 4,
-            "source": "sample",
-            "error": str(e)
-        }
+        return {"data": [], "count": 0, "error": str(e)}
 
 def get_sample_fixtures(sport: str):
     """
