@@ -1,6 +1,18 @@
 import os
 import pandas as pd
 import numpy as np
+
+SPORT_NAME_MAP = {
+    "mlb": "mlb",
+    "nfl": "nfl",
+    "cricket": "cricket",
+    "nba": "basketball",
+    "basketball": "basketball",
+    "tennis": "tennis",
+    "football": "football",
+    "nhl": "nhl",
+}
+
 from datetime import datetime
 from app.database import get_supabase_admin
 
