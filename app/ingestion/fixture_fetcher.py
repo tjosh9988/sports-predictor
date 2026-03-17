@@ -176,67 +176,113 @@ async def fetch_sport_fixtures(
     
     return inserted
 
+TOP_LEAGUE_IDS = [
+    2,    # UEFA Champions League
+    3,    # UEFA Europa League
+    848,  # UEFA Conference League
+    39,   # English Premier League
+    140,  # La Liga
+    78,   # Bundesliga
+    135,  # Serie A
+    61,   # Ligue 1
+    94,   # Primeira Liga
+    88,   # Eredivisie
+    203,  # Super Lig Turkey
+    144,  # Belgian Pro League
+    253,  # MLS
+    292,  # Saudi Pro League
+    307,  # Saudi Division 1
+    188,  # Championship England
+]
+
 async def fetch_football_with_odds():
     from datetime import datetime, timedelta
-    import httpx
-    from app.database import get_supabase_admin
-    
     supabase = get_supabase_admin()
     inserted = 0
-    
-    # Fetch fixtures for next 7 days
-    # using date parameter (works on free plan)
     today = datetime.now()
     
-    async with httpx.AsyncClient(timeout=30) as client:
-        for days_ahead in range(0, 2):
-            target_date = today + timedelta(days=days_ahead)
-            date_str = target_date.strftime("%Y-%m-%d")
-            
-            print(f"Fetching football fixtures for {date_str}...")
-            
-            try:
+    for days_ahead in range(0, 3):
+        target_date = today + timedelta(days=days_ahead)
+        date_str = target_date.strftime("%Y-%m-%d")
+        print(f"Fetching fixtures for {date_str}...")
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(
                     "https://v3.football.api-sports.io/fixtures",
                     headers={"x-apisports-key": API_KEY},
                     params={"date": date_str}
                 )
-                
+
                 if resp.status_code != 200:
-                    print(f"Error {resp.status_code} for {date_str}")
+                    print(f"API error {resp.status_code}")
                     continue
-                
+
                 data = resp.json()
                 errors = data.get("errors", {})
-                
                 if errors:
-                    print(f"API errors for {date_str}: {errors}")
+                    print(f"API errors: {errors}")
                     continue
-                
-                fixtures = data.get("response", [])
-                print(f"{date_str}: {len(fixtures)} fixtures")
-                
-                for f in fixtures:
+
+                all_fixtures = data.get("response", [])
+
+                # Prioritise top leagues but include all
+                top = [
+                    f for f in all_fixtures
+                    if f.get("league", {}).get("id")
+                    in TOP_LEAGUE_IDS
+                ]
+                others = [
+                    f for f in all_fixtures
+                    if f.get("league", {}).get("id")
+                    not in TOP_LEAGUE_IDS
+                ]
+
+                # Top leagues first then others up to 200
+                fixtures_to_save = top + others[:200]
+
+                print(
+                    f"{date_str}: {len(top)} top league + "
+                    f"{len(others)} other fixtures"
+                )
+
+                for f in fixtures_to_save:
                     try:
                         match = map_football_fixture(f)
-                        if not match["home_team"]:
+                        if not match.get("home_team"):
                             continue
                         
+                        # Get odds if available in top-level response (sometimes present)
+                        odds_data = f.get("odds", [])
+                        if odds_data:
+                            for odd in odds_data:
+                                for value in odd.get("values", []):
+                                    if value.get("value") == "Home":
+                                        match["home_odds"] = float(value.get("odd", 2.0))
+                                    elif value.get("value") == "Away":
+                                        match["away_odds"] = float(value.get("odd", 2.0))
+                                    elif value.get("value") == "Draw":
+                                        match["draw_odds"] = float(value.get("odd", 3.0))
+
                         supabase.table("matches")\
-                            .upsert(match)\
-                            .execute()
+                            .upsert(
+                                match,
+                                on_conflict=(
+                                    "sport,home_team,"
+                                    "away_team,match_date"
+                                )
+                            ).execute()
                         inserted += 1
-                    except Exception as e:
+                    except Exception:
                         continue
-                
-                # Rate limit — 100 req/day = careful
+
                 await asyncio.sleep(2)
-                
-            except Exception as e:
-                print(f"Date {date_str} error: {e}")
-                continue
-    
-    print(f"Football: {inserted} fixtures inserted")
+
+        except Exception as e:
+            print(f"Fetch error {date_str}: {e}")
+            continue
+
+    print(f"Total football fixtures inserted: {inserted}")
     return inserted
 
 async def fetch_all_fixtures():
