@@ -438,111 +438,85 @@ def generate_reasoning(
 
 async def build_all_accumulators():
     print("BUILD ACCUMULATORS STARTED")
+    from datetime import datetime, timezone
     supabase = get_supabase_admin()
+    now = datetime.now(timezone.utc)
 
-    try:
-        result = supabase.table("matches")\
-            .select("*")\
-            .eq("status", "upcoming")\
-            .limit(200)\
-            .execute()
-        fixtures = result.data or []
-        print(f"UPCOMING FIXTURES FOUND: {len(fixtures)}")
-    except Exception as e:
-        print(f"Fixture fetch error: {e}")
-        return
+    result = supabase.table("matches")\
+        .select("*")\
+        .eq("status", "upcoming")\
+        .gte("match_date", now.isoformat())\
+        .order("match_date")\
+        .limit(300)\
+        .execute()
+
+    fixtures = result.data or []
+    print(f"UPCOMING FIXTURES: {len(fixtures)}")
 
     if not fixtures:
         print("No upcoming fixtures found")
         return
 
-    value_preds = []
+    all_predictions = []
+
     for f in fixtures:
+        home = f.get("home_team", "")
+        away = f.get("away_team", "")
+        sport = f.get("sport", "football")
+        if not home or not away:
+            continue
         try:
-            home = f.get("home_team", "")
-            away = f.get("away_team", "")
-            sport = f.get("sport", "football")
-
-            if not home or not away:
-                continue
-
-            pred = predict_match(
-                home,
-                away,
-                sport,
-                f.get("home_odds", 2.0),
-                f.get("away_odds", 2.0),
-                f.get("draw_odds", 3.0)
+            markets = predict_all_markets(
+                home, away, sport,
+                f.get("home_odds"),
+                f.get("away_odds"),
+                f.get("draw_odds"),
+                supabase
             )
-
-            print(f"{home} vs {away}: EV={pred['ev']:.4f}")
-
-            if pred["ev"] > 0:
-                value_preds.append({
+            for market_pred in markets:
+                all_predictions.append({
                     "fixture": f,
-                    "prediction": pred
+                    "prediction": market_pred
                 })
-
         except Exception as e:
-            print(f"Prediction error: {e}")
+            print(f"Error {home} vs {away}: {e}")
             continue
 
-    print(f"VALUE PREDICTIONS FOUND: {len(value_preds)}")
+    print(f"TOTAL MARKET PREDICTIONS: {len(all_predictions)}")
 
-    if not value_preds:
-        print("No value predictions found - relaxing EV threshold")
-        value_preds = []
-        for f in fixtures:
-            try:
-                home = f.get("home_team", "")
-                away = f.get("away_team", "")
-                sport = f.get("sport", "football")
-                if not home or not away:
-                    continue
-                pred = predict_match(
-                    home, away, sport,
-                    f.get("home_odds", 2.0),
-                    f.get("away_odds", 2.0),
-                    f.get("draw_odds", 3.0)
-                )
-                value_preds.append({
-                    "fixture": f,
-                    "prediction": pred
-                })
-            except Exception:
-                continue
-
-    value_preds.sort(
+    # Sort by EV descending
+    all_predictions.sort(
         key=lambda x: x["prediction"]["ev"],
         reverse=True
     )
 
     used_ids = set()
+    used_match_market = set()
 
     configs = [
         {
             "type": "10odds",
             "target": 10.0,
-            "max_legs": 8,
-            "min_legs": 6,
-            "min_conf": 50,
-            "max_single_odds": 1.40,
+            "max_legs": 12,
+            "min_legs": 7,
+            "min_conf": 52,
+            "max_single_odds": 1.50,
             "min_single_odds": 1.10,
         },
         {
             "type": "5odds",
             "target": 5.0,
-            "max_legs": 7,
-            "min_legs": 5,
+            "max_legs": 10,
+            "min_legs": 7,
             "min_conf": 55,
-            "max_single_odds": 1.30,
+            "max_single_odds": 1.35,
             "min_single_odds": 1.10,
         },
         {
             "type": "3odds",
             "target": 3.0,
-            "max_legs": 5,
-            "min_legs": 3,
+            "max_legs": 7,
+            "min_legs": 5,
             "min_conf": 60,
             "max_single_odds": 1.25,
             "min_single_odds": 1.10,
@@ -550,13 +524,16 @@ async def build_all_accumulators():
     ]
 
     for cfg in configs:
-        await save_accumulator(supabase, value_preds, used_ids, cfg)
+        await save_accumulator(
+            supabase, all_predictions,
+            used_ids, used_match_market, cfg
+        )
 
     print("ALL ACCUMULATORS BUILT SUCCESSFULLY")
 
 
 async def save_accumulator(
-    supabase, all_preds, used_ids, config
+    supabase, all_preds, used_ids, used_match_market, config
 ):
     acca_type = config["type"]
     max_legs = config["max_legs"]
@@ -577,8 +554,11 @@ async def save_accumulator(
             f"{f.get('home_team')}_"
             f"{f.get('away_team')}"
         )
+        match_market_key = f"{fid}_{pred['market']}_{pred['outcome']}"
 
         if fid in used_ids:
+            continue
+        if match_market_key in used_match_market:
             continue
         if match_key in local_matches:
             continue
@@ -615,6 +595,7 @@ async def save_accumulator(
         })
         combined_odds *= leg_odds
         used_ids.add(fid)
+        used_match_market.add(match_market_key)
         local_matches.add(match_key)
 
     # Only save if we have minimum legs
@@ -637,7 +618,11 @@ async def save_accumulator(
                 f"{f.get('away_team')}"
             )
 
+            match_market_key = f"{fid}_{pred['market']}_{pred['outcome']}"
+
             if fid in used_ids:
+                continue
+            if match_market_key in used_match_market:
                 continue
             if match_key in local_matches:
                 continue
@@ -662,6 +647,7 @@ async def save_accumulator(
             })
             combined_odds *= leg_odds
             used_ids.add(fid)
+            used_match_market.add(match_market_key)
             local_matches.add(match_key)
 
     if not legs:
@@ -706,7 +692,7 @@ async def save_accumulator(
                 "predictions"
             ).insert({
                 "match_id": str(f.get("id")),
-                "market": "Match Result",
+                "market": pred["market"],
                 "predicted_outcome": pred["outcome"],
                 "model_probability": pred["model_probability"],
                 "implied_probability": pred["implied_probability"],
@@ -727,7 +713,7 @@ async def save_accumulator(
                 "league": f.get("league", ""),
                 "home_team": f.get("home_team", ""),
                 "away_team": f.get("away_team", ""),
-                "market": "Match Result",
+                "market": pred["market"],
                 "predicted_outcome": pred["outcome"],
                 "odds": pred["odds"],
                 "confidence": pred["confidence"],
