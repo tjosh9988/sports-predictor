@@ -1,7 +1,7 @@
 class AccumulatorLegModel {
   final String id;
-  final int accumulatorId;
-  final int? matchId;
+  final String accumulatorId;
+  final String? matchId;
   final String sport;
   final String league;
   final String homeTeam;
@@ -38,8 +38,8 @@ class AccumulatorLegModel {
   factory AccumulatorLegModel.fromJson(Map<String, dynamic> json) {
     return AccumulatorLegModel(
       id: json['id']?.toString() ?? '',
-      accumulatorId: (json['accumulator_id'] as num?)?.toInt() ?? 0,
-      matchId: (json['match_id'] as num?)?.toInt(),
+      accumulatorId: json['accumulator_id']?.toString() ?? '',
+      matchId: json['match_id']?.toString(),
       homeTeam: json['home_team']?.toString() ?? 'Unknown',
       awayTeam: json['away_team']?.toString() ?? 'Unknown',
       league: json['league']?.toString() ?? '',
