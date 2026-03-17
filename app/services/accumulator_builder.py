@@ -143,9 +143,37 @@ def predict_match(
     home_wr = get_team_form(supabase, home_team, sport)
     away_wr = get_team_form(supabase, away_team, sport)
 
-    ho = float(home_odds or 2.0)
-    ao = float(away_odds or 2.0)
-    do = float(draw_odds or 3.0)
+    # Generate realistic odds from win rates
+    # when bookmaker odds are not available
+    if not home_odds or home_odds == 0:
+        # Convert win rate to odds with 5% margin
+        if home_wr > 0.65:
+            home_odds = round(1.0 / (home_wr * 1.05), 2)
+            home_odds = max(1.15, min(home_odds, 1.80))
+        elif home_wr > 0.50:
+            home_odds = round(1.0 / (home_wr * 1.05), 2)
+            home_odds = max(1.50, min(home_odds, 2.20))
+        else:
+            home_odds = round(1.0 / (home_wr * 1.05), 2)
+            home_odds = max(2.00, min(home_odds, 4.00))
+
+    if not away_odds or away_odds == 0:
+        if away_wr > 0.65:
+            away_odds = round(1.0 / (away_wr * 1.05), 2)
+            away_odds = max(1.15, min(away_odds, 1.80))
+        elif away_wr > 0.50:
+            away_odds = round(1.0 / (away_wr * 1.05), 2)
+            away_odds = max(1.50, min(away_odds, 2.20))
+        else:
+            away_odds = round(1.0 / (away_wr * 1.05), 2)
+            away_odds = max(2.00, min(away_odds, 4.00))
+
+    if not draw_odds or draw_odds == 0:
+        draw_odds = 3.20  # League average draw
+
+    ho = float(home_odds)
+    ao = float(away_odds)
+    do = float(draw_odds)
 
     feature = np.array([[
         home_wr,
@@ -317,29 +345,29 @@ async def build_all_accumulators():
         {
             "type": "10odds",
             "target": 10.0,
-            "max_legs": 13,      # 7-10 legs
-            "min_legs": 7,       # minimum 7 legs
-            "min_conf": 55,
-            "max_single_odds": 1.8,   # LOW odds per leg
-            "min_single_odds": 1.2,   # minimum odds per leg
+            "max_legs": 10,
+            "min_legs": 7,
+            "min_conf": 50,
+            "max_single_odds": 1.45,
+            "min_single_odds": 1.10,
         },
         {
             "type": "5odds",
             "target": 5.0,
-            "max_legs": 9,       # exactly 7 legs
-            "min_legs": 7,
-            "min_conf": 60,
-            "max_single_odds": 1.5,   # Very low odds
-            "min_single_odds": 1.1,
+            "max_legs": 7,
+            "min_legs": 5,
+            "min_conf": 55,
+            "max_single_odds": 1.30,
+            "min_single_odds": 1.10,
         },
         {
             "type": "3odds",
             "target": 3.0,
-            "max_legs": 7,       # exactly 5 legs
-            "min_legs": 5,
-            "min_conf": 65,
-            "max_single_odds": 1.35,  # Lowest risk
-            "min_single_odds": 1.1,
+            "max_legs": 5,
+            "min_legs": 3,
+            "min_conf": 60,
+            "max_single_odds": 1.25,
+            "min_single_odds": 1.10,
         },
     ]
 
