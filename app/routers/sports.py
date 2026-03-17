@@ -63,41 +63,33 @@ async def get_sport_fixtures(sport: str, date: str = None):
             .select("*")\
             .eq("status", "upcoming")\
             .order("match_date")
-        
+
         if sport != "all":
             query = query.eq("sport", sport)
-        
+
         if date:
-            # Use date string prefix match instead of range
-            query = query.gte("match_date", f"{date}T00:00:00")\
-                         .lte("match_date", f"{date}T23:59:59+23:59")
-        
-        result = query.limit(100).execute()
+            query = query\
+                .gte("match_date", f"{date}T00:00:00")\
+                .lte("match_date", f"{date}T23:59:59+23:59")
+
+        result = query.limit(500).execute()
         fixtures = result.data or []
-        
-        if fixtures:
-            return {
-                "data": fixtures,
-                "count": len(fixtures),
-                "source": "database"
-            }
-        
-        # Debug info
-        total = supabase.table("matches")\
-            .select("id", count="exact")\
-            .eq("status", "upcoming")\
-            .execute()
-        
+
+        # Deduplicate by home_team + away_team + match_date
+        seen = set()
+        unique_fixtures = []
+        for f in fixtures:
+            key = f"{f.get('home_team')}_{f.get('away_team')}_{f.get('match_date','')[:16]}"
+            if key not in seen:
+                seen.add(key)
+                unique_fixtures.append(f)
+
         return {
-            "data": [],
-            "count": 0,
-            "source": "empty",
-            "debug_total_upcoming": total.count if hasattr(total, 'count') else 0,
-            "date_queried": date
+            "data": unique_fixtures,
+            "count": len(unique_fixtures),
+            "source": "database"
         }
-        
     except Exception as e:
-        logger.error(f"Fixtures error: {e}")
         return {"data": [], "count": 0, "error": str(e)}
 
 def get_sample_fixtures(sport: str):

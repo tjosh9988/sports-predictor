@@ -6,3 +6,11 @@ __pycache__/
 *.joblib
 mlruns/
 .DS_Store
+sports_env/
+venv/
+env/
+*.csv
+*.csv.gz
+/data/
+/stats/
+/temp/
