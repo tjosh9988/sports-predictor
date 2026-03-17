@@ -6,7 +6,7 @@ from app.base import Base
 class Sport(Base):
     __tablename__ = "sports"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     slug = Column(String, unique=True, nullable=False, index=True)
 
@@ -22,7 +22,7 @@ class Sport(Base):
 class League(Base):
     __tablename__ = "leagues"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     sport = Column(String, ForeignKey("sports.slug"), nullable=False, index=True)
     name = Column(String, nullable=False, index=True)
     country = Column(String, index=True)

@@ -8,7 +8,7 @@ class ModelPerformance(Base):
     Updated periodically after match results are resolved."""
     __tablename__ = "model_performance"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     model_name = Column(String, nullable=False, index=True)  # random_forest, xgboost, lightgbm, lstm
     sport = Column(String, nullable=False, index=True)
     market = Column(String, nullable=False, index=True)  # 1X2, Over/Under 2.5, etc.

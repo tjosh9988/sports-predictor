@@ -6,9 +6,9 @@ from app.base import Base
 class Team(Base):
     __tablename__ = "teams"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     sport = Column(String, ForeignKey("sports.slug"), nullable=False, index=True)
-    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=True, index=True)
+    league_id = Column(String, ForeignKey("leagues.id"), nullable=True, index=True)
     name = Column(String, nullable=False, index=True)
     short_name = Column(String)
     country = Column(String, index=True)

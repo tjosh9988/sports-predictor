@@ -9,8 +9,8 @@ class SentimentScore(Base):
     Used as an additional ML feature for prediction models."""
     __tablename__ = "sentiment_scores"
 
-    id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
     score = Column(Float, nullable=False)  # -1.0 (very negative) to 1.0 (very positive)
     source = Column(String, nullable=False, index=True)  # twitter, news, reddit, etc.
     summary = Column(Text, nullable=True)  # Brief summary of sentiment drivers

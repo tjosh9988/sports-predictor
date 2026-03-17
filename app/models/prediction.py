@@ -7,8 +7,8 @@ from app.base import Base
 class Prediction(Base):
     __tablename__ = "predictions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=False, index=True)
     market = Column(String, nullable=False, index=True)  # 1X2, Over/Under 2.5, BTTS, etc.
     predicted_outcome = Column(String, nullable=False)  # Home, Away, Draw, Over, Under, Yes, No
     model_probability = Column(Float, nullable=False)  # ML model output probability
@@ -31,8 +31,8 @@ class Prediction(Base):
 class PredictionResult(Base):
     __tablename__ = "prediction_results"
 
-    id = Column(Integer, primary_key=True, index=True)
-    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False, unique=True, index=True)
+    id = Column(String, primary_key=True, index=True)
+    prediction_id = Column(String, ForeignKey("predictions.id"), nullable=False, unique=True, index=True)
     actual_result = Column(String, nullable=False)
     goals_home = Column(Integer, nullable=True)
     goals_away = Column(Integer, nullable=True)

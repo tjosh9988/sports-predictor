@@ -13,7 +13,7 @@ class SportCreate(SportBase):
     pass
 
 class SportOut(SportBase):
-    id: int
+    id: str
     class Config:
         from_attributes = True
 
@@ -27,8 +27,9 @@ class LeagueCreate(LeagueBase):
     sport: str
 
 class LeagueOut(LeagueBase):
-    id: int
+    id: str
     sport: str
+    sport_id: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -46,9 +47,10 @@ class TeamCreate(TeamBase):
     league_id: Optional[int] = None
 
 class TeamOut(TeamBase):
-    id: int
+    id: str
     sport: str
-    league_id: Optional[int] = None
+    league_id: Optional[str] = None
+    sport_id: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -66,7 +68,7 @@ class RefereeCreate(RefereeBase):
     sport: str
 
 class RefereeOut(RefereeBase):
-    id: int
+    id: str
     sport: str
     class Config:
         from_attributes = True
@@ -90,10 +92,12 @@ class MatchCreate(MatchBase):
     referee_id: Optional[int] = None
 
 class MatchOut(MatchBase):
-    id: int
+    id: str
     sport: str
-    league_id: int
-    referee_id: Optional[int] = None
+    league_id: Optional[str] = None
+    referee_id: Optional[str] = None
+    home_team_id: str
+    away_team_id: str
     home_score: Optional[int] = None
     away_score: Optional[int] = None
     class Config:
@@ -109,8 +113,8 @@ class MatchStatCreate(MatchStatBase):
     match_id: int
 
 class MatchStatOut(MatchStatBase):
-    id: int
-    match_id: int
+    id: str
+    match_id: str
     class Config:
         from_attributes = True
 
@@ -131,8 +135,8 @@ class OddsHistoryCreate(OddsHistoryBase):
     match_id: int
 
 class OddsHistoryOut(OddsHistoryBase):
-    id: int
-    match_id: int
+    id: str
+    match_id: str
     recorded_at: datetime
     class Config:
         from_attributes = True
@@ -148,8 +152,8 @@ class TeamFeatureCreate(TeamFeatureBase):
     team_id: int
 
 class TeamFeatureOut(TeamFeatureBase):
-    id: int
-    team_id: int
+    id: str
+    team_id: str
     calculated_at: datetime
     class Config:
         from_attributes = True
@@ -163,9 +167,9 @@ class EloRatingCreate(EloRatingBase):
     match_id: Optional[int] = None
 
 class EloRatingOut(EloRatingBase):
-    id: int
-    team_id: int
-    match_id: Optional[int] = None
+    id: str
+    team_id: str
+    match_id: Optional[str] = None
     calculated_at: datetime
     class Config:
         from_attributes = True
@@ -186,8 +190,8 @@ class PredictionCreate(PredictionBase):
     match_id: int
 
 class PredictionOut(PredictionBase):
-    id: int
-    match_id: int
+    id: str
+    match_id: str
     status: str
     actual_outcome: Optional[str] = None
     created_at: datetime
@@ -204,8 +208,8 @@ class PredictionResultCreate(PredictionResultBase):
     prediction_id: int
 
 class PredictionResultOut(PredictionResultBase):
-    id: int
-    prediction_id: int
+    id: str
+    prediction_id: str
     resolved_at: datetime
     class Config:
         from_attributes = True
@@ -214,11 +218,21 @@ class PredictionResultOut(PredictionResultBase):
 # ──────────────────── Accumulators ────────────────────────────────
 
 class AccumulatorLegOut(BaseModel):
-    id: int
-    prediction_id: int
-    leg_order: int
+    id: str
+    prediction_id: str
+    match_id: Optional[str] = None
+    home_team: Optional[str] = None
+    away_team: Optional[str] = None
+    league: Optional[str] = None
+    sport: Optional[str] = None
+    market: Optional[str] = None
+    predicted_outcome: Optional[str] = None
     odds: float
+    confidence: Optional[float] = None
+    edge: Optional[float] = None
+    ai_reasoning: Optional[str] = None
     status: str
+    leg_order: int
     class Config:
         from_attributes = True
 
@@ -233,7 +247,7 @@ class AccumulatorCreate(AccumulatorBase):
     leg_prediction_ids: List[int]  # List of prediction IDs for the legs
 
 class AccumulatorOut(AccumulatorBase):
-    id: int
+    id: str
     status: str
     created_at: datetime
     legs: List[AccumulatorLegOut] = []
@@ -270,7 +284,7 @@ class ModelPerformanceBase(BaseModel):
     total_predictions: int
 
 class ModelPerformanceOut(ModelPerformanceBase):
-    id: int
+    id: str
     recorded_at: datetime
     class Config:
         from_attributes = True
@@ -287,8 +301,8 @@ class SentimentScoreCreate(SentimentScoreBase):
     team_id: int
 
 class SentimentScoreOut(SentimentScoreBase):
-    id: int
-    team_id: int
+    id: str
+    team_id: str
     recorded_at: datetime
     class Config:
         from_attributes = True

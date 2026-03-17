@@ -51,10 +51,11 @@ async def get_today_accumulators():
             return {"data": filtered, "count": len(filtered), "source": "database"}
             
         # Mock data if empty
+        mock_acca_id = "5001-mock-uuid"
         return {
             "data": [
                 {
-                    "id": 5001,
+                    "id": mock_acca_id,
                     "acca_type": "10odds",
                     "total_odds": 10.24,
                     "status": "pending",
@@ -63,27 +64,57 @@ async def get_today_accumulators():
                     "created_at": now.isoformat(),
                     "legs": [
                         {
-                            "id": 6001,
-                            "accumulator_id": 5001,
-                            "prediction_id": 7001,
+                            "id": "6001-mock-uuid",
+                            "accumulator_id": mock_acca_id,
+                            "prediction_id": "7001-mock-uuid",
+                            "match_id": "8001-mock-uuid",
+                            "home_team": "Manchester City",
+                            "away_team": "Liverpool",
+                            "league": "Premier League",
+                            "sport": "football",
+                            "market": "Match Result",
+                            "predicted_outcome": "Home Win",
                             "leg_order": 1,
                             "odds": 2.10,
+                            "confidence": 68.5,
+                            "edge": 4.2,
+                            "ai_reasoning": "Man City have won 8 of their last 10 home matches.",
                             "status": "pending"
                         },
                         {
-                            "id": 6002,
-                            "accumulator_id": 5001,
-                            "prediction_id": 7002,
+                            "id": "6002-mock-uuid",
+                            "accumulator_id": mock_acca_id,
+                            "prediction_id": "7002-mock-uuid",
+                            "match_id": "8002-mock-uuid",
+                            "home_team": "Real Madrid",
+                            "away_team": "Barcelona",
+                            "league": "La Liga",
+                            "sport": "football",
+                            "market": "Goals",
+                            "predicted_outcome": "Over 2.5",
                             "leg_order": 2,
                             "odds": 1.85,
+                            "confidence": 65.0,
+                            "edge": 3.8,
+                            "ai_reasoning": "El Clasico matches average 3.2 goals in the last 5 seasons.",
                             "status": "pending"
                         },
                         {
-                            "id": 6003,
-                            "accumulator_id": 5001,
-                            "prediction_id": 7003,
+                            "id": "6003-mock-uuid",
+                            "accumulator_id": mock_acca_id,
+                            "prediction_id": "7003-mock-uuid",
+                            "match_id": "8003-mock-uuid",
+                            "home_team": "Bayern Munich",
+                            "away_team": "Dortmund",
+                            "league": "Bundesliga",
+                            "sport": "football",
+                            "market": "BTTS",
+                            "predicted_outcome": "Yes",
                             "leg_order": 3,
                             "odds": 1.72,
+                            "confidence": 72.0,
+                            "edge": 5.1,
+                            "ai_reasoning": "Both teams have scored in all of their last 6 meetings.",
                             "status": "pending"
                         }
                     ]

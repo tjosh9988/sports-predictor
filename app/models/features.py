@@ -9,8 +9,8 @@ class TeamFeature(Base):
     using only data available BEFORE the match (no data leakage)."""
     __tablename__ = "team_features"
 
-    id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
     calculated_at = Column(DateTime, default=datetime.utcnow, index=True)
     feature_name = Column(String, nullable=False, index=True)  # form_last5, avg_goals_scored, etc.
     feature_value = Column(Float, nullable=False)
@@ -26,11 +26,11 @@ class EloRating(Base):
     triggered the recalculation."""
     __tablename__ = "elo_ratings"
 
-    id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
     rating = Column(Float, nullable=False)
     calculated_at = Column(DateTime, default=datetime.utcnow, index=True)
-    match_id = Column(Integer, ForeignKey("matches.id"), nullable=True, index=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=True, index=True)
 
     team = relationship("Team", back_populates="elo_history")
     match = relationship("Match", back_populates="elo_snapshots")

@@ -6,11 +6,11 @@ from app.base import Base
 class Match(Base):
     __tablename__ = "matches"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     sport = Column(String, ForeignKey("sports.slug"), nullable=False, index=True)
-    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False, index=True)
-    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
-    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    league_id = Column(String, ForeignKey("leagues.id"), nullable=False, index=True)
+    home_team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
+    away_team_id = Column(String, ForeignKey("teams.id"), nullable=False, index=True)
     match_date = Column(DateTime, nullable=False, index=True)
     status = Column(String, default="upcoming", index=True)  # upcoming, live, finished, postponed
     home_score = Column(Integer, nullable=True)
@@ -18,7 +18,7 @@ class Match(Base):
     season = Column(String, index=True)
     round = Column(String, nullable=True)
     venue = Column(String, nullable=True)
-    referee_id = Column(Integer, ForeignKey("referees.id"), nullable=True)
+    referee_id = Column(String, ForeignKey("referees.id"), nullable=True)
     attendance = Column(Integer, nullable=True)
 
     sport_rel = relationship("Sport", back_populates="matches")
@@ -38,8 +38,8 @@ class Match(Base):
 class MatchStat(Base):
     __tablename__ = "match_stats"
 
-    id = Column(Integer, primary_key=True, index=True)
-    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=False, index=True)
     stat_type = Column(String, nullable=False, index=True)  # possession, shots, corners, etc.
     home_value = Column(Float)
     away_value = Column(Float)

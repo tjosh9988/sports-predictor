@@ -7,8 +7,8 @@ from app.base import Base
 class OddsHistory(Base):
     __tablename__ = "odds_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    match_id = Column(String, ForeignKey("matches.id"), nullable=False, index=True)
     bookmaker = Column(String, nullable=False, index=True)
     market = Column(String, nullable=False, index=True)  # 1X2, Over/Under 2.5, BTTS, etc.
 

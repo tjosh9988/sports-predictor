@@ -7,7 +7,7 @@ from app.base import Base
 class Accumulator(Base):
     __tablename__ = "accumulators"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     acca_type = Column(String, nullable=False, index=True)  # 3odds, 5odds, 10odds
     total_odds = Column(Float, nullable=False)
     status = Column(String, default="PENDING", index=True)  # PENDING, WON, LOST
@@ -25,9 +25,9 @@ class Accumulator(Base):
 class AccumulatorLeg(Base):
     __tablename__ = "accumulator_legs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    accumulator_id = Column(Integer, ForeignKey("accumulators.id"), nullable=False, index=True)
-    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False, index=True)
+    id = Column(String, primary_key=True, index=True)
+    accumulator_id = Column(String, ForeignKey("accumulators.id"), nullable=False, index=True)
+    prediction_id = Column(String, ForeignKey("predictions.id"), nullable=False, index=True)
     leg_order = Column(Integer, nullable=False)
     odds = Column(Float, nullable=False)
     status = Column(String, default="PENDING")  # PENDING, WON, LOST

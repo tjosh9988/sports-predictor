@@ -7,7 +7,7 @@ class UserPreference(Base):
     this table links to their Supabase auth UUID."""
     __tablename__ = "user_preferences"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     user_id = Column(String, unique=True, nullable=False, index=True)  # Supabase Auth UUID
     favorite_sports = Column(JSON, default=list)  # ["football", "nba"]
     favorite_leagues = Column(JSON, default=list)  # ["premier_league", "la_liga"]
