@@ -533,7 +533,8 @@ async def build_all_accumulators():
 
 
 async def save_accumulator(
-    supabase, all_preds, used_ids, used_match_market, config
+    supabase, all_preds, used_ids,
+    used_match_market, config
 ):
     acca_type = config["type"]
     max_legs = config["max_legs"]
@@ -541,43 +542,29 @@ async def save_accumulator(
     min_conf = config["min_conf"]
     max_odds = config["max_single_odds"]
     min_odds = config["min_single_odds"]
-
     legs = []
     combined_odds = 1.0
-    local_matches = set()
+    local_match_ids = set()
 
     for item in all_preds:
+        if len(legs) >= max_legs:
+            break
+
         f = item["fixture"]
         pred = item["prediction"]
         fid = f.get("id")
-        match_key = (
-            f"{f.get('home_team')}_"
-            f"{f.get('away_team')}"
-        )
-        match_market_key = f"{fid}_{pred['market']}_{pred['outcome']}"
+        market = pred.get("market", "")
+        match_market_key = f"{fid}_{market}_{pred.get('outcome','')}"
 
-        if fid in used_ids:
+        if fid in local_match_ids:
             continue
         if match_market_key in used_match_market:
             continue
-        if match_key in local_matches:
-            continue
         if pred["confidence"] < min_conf:
             continue
-        if len(legs) >= max_legs:
-            print(f"Reached max legs: {max_legs}")
-            break
 
-        # ENFORCE LOW ODDS PER LEG
         leg_odds = pred["odds"]
-        if leg_odds > max_odds:
-            continue
-        if leg_odds < min_odds:
-            continue
-
-        # Check combined odds won't overshoot
-        new_combined = combined_odds * leg_odds
-        if new_combined > config["target"] * 2.0:
+        if leg_odds > max_odds or leg_odds < min_odds:
             continue
 
         reasoning = generate_reasoning(
@@ -595,88 +582,29 @@ async def save_accumulator(
         })
         combined_odds *= leg_odds
         used_ids.add(fid)
+        local_match_ids.add(fid)
         used_match_market.add(match_market_key)
-        local_matches.add(match_key)
 
-    # Only save if we have minimum legs
     if len(legs) < min_legs:
-        print(
-            f"{acca_type}: Only {len(legs)} legs found, "
-            f"need minimum {min_legs}"
-        )
-        # Relax confidence and try again with all preds
-        legs = []
-        combined_odds = 1.0
-        local_matches = set()
-
-        for item in all_preds:
-            f = item["fixture"]
-            pred = item["prediction"]
-            fid = f.get("id")
-            match_key = (
-                f"{f.get('home_team')}_"
-                f"{f.get('away_team')}"
-            )
-
-            match_market_key = f"{fid}_{pred['market']}_{pred['outcome']}"
-
-            if fid in used_ids:
-                continue
-            if match_market_key in used_match_market:
-                continue
-            if match_key in local_matches:
-                continue
-            if len(legs) >= max_legs:
-                print(f"Reached max legs (relaxed): {max_legs}")
-                break
-
-            leg_odds = pred["odds"]
-            if leg_odds > max_odds + 0.3:
-                continue
-
-            legs.append({
-                "fixture": f,
-                "prediction": pred,
-                "reasoning": generate_reasoning(
-                    f.get("home_team", ""),
-                    f.get("away_team", ""),
-                    f.get("sport", ""),
-                    f.get("league", ""),
-                    pred
-                )
-            })
-            combined_odds *= leg_odds
-            used_ids.add(fid)
-            used_match_market.add(match_market_key)
-            local_matches.add(match_key)
-
-    if not legs:
-        print(f"No legs found for {acca_type}")
+        print(f"{acca_type}: only {len(legs)} legs, need {min_legs}")
         return
 
-    # Save to database (same as before)
     avg_conf = sum(
         l["prediction"]["confidence"] for l in legs
     ) / len(legs)
 
-    print(
-        f"{acca_type}: {len(legs)} legs, "
-        f"{combined_odds:.2f} combined odds"
-    )
+    print(f"{acca_type}: {len(legs)} legs, {combined_odds:.2f} odds")
 
     try:
-        acca_result = supabase.table(
-            "accumulators"
-        ).insert({
+        acca_result = supabase.table("accumulators").insert({
             "acca_type": acca_type,
             "total_odds": round(combined_odds, 2),
             "status": "PENDING",
             "ai_reasoning": (
-                f"AI selected {len(legs)} low-risk value "
-                f"bets with combined odds of "
-                f"{combined_odds:.2f}. Each selection "
-                f"has high confidence and positive "
-                f"expected value."
+                f"AI selected {len(legs)} value bets across "
+                f"multiple markets including goals, corners, "
+                f"BTTS and match result with combined odds of "
+                f"{combined_odds:.2f}."
             ),
             "confidence_score": round(avg_conf, 1),
             "created_at": datetime.now().isoformat()
@@ -688,11 +616,9 @@ async def save_accumulator(
             f = leg["fixture"]
             pred = leg["prediction"]
 
-            pred_result = supabase.table(
-                "predictions"
-            ).insert({
+            pred_result = supabase.table("predictions").insert({
                 "match_id": str(f.get("id")),
-                "market": pred["market"],
+                "market": pred.get("market", "Match Result"),
                 "predicted_outcome": pred["outcome"],
                 "model_probability": pred["model_probability"],
                 "implied_probability": pred["implied_probability"],
@@ -713,7 +639,7 @@ async def save_accumulator(
                 "league": f.get("league", ""),
                 "home_team": f.get("home_team", ""),
                 "away_team": f.get("away_team", ""),
-                "market": pred["market"],
+                "market": pred.get("market", "Match Result"),
                 "predicted_outcome": pred["outcome"],
                 "odds": pred["odds"],
                 "confidence": pred["confidence"],
@@ -724,7 +650,7 @@ async def save_accumulator(
                 "created_at": datetime.now().isoformat()
             }).execute()
 
-        print(f"Saved {acca_type}: {len(legs)} legs")
+        print(f"Saved {acca_type}: ID={acca_id}")
 
     except Exception as e:
         print(f"Save error {acca_type}: {e}")
