@@ -189,7 +189,7 @@ async def fetch_football_with_odds():
     today = datetime.now()
     
     async with httpx.AsyncClient(timeout=30) as client:
-        for days_ahead in range(0, 7):
+        for days_ahead in range(0, 2):
             target_date = today + timedelta(days=days_ahead)
             date_str = target_date.strftime("%Y-%m-%d")
             
