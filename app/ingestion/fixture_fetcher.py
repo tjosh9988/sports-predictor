@@ -240,29 +240,73 @@ async def fetch_football_with_odds():
     return inserted
 
 async def fetch_all_fixtures():
-    print("Fetching real fixtures from API-Sports...")
+    from datetime import datetime
+    print("Fetching fixtures from API-Sports...")
     total = 0
-    
-    # Football - primary sport
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # Football - 2 days
     count = await fetch_football_with_odds()
     total += count
-    print(f"Football fixtures: {count}")
-    
-    # Basketball (NBA)
+    print(f"Football: {count}")
+
+    await asyncio.sleep(2)
+
+    # Basketball NBA
     try:
-        count = await fetch_sport_fixtures(
-            "basketball",
-            "https://v1.basketball.api-sports.io/games",
-            {"league": "12", "season": "2024-2025",
-             "date": datetime.now().strftime("%Y-%m-%d")},
-            "map_basketball_fixture"
-        )
-        total += count
-        print(f"Basketball: {count}")
+        async with httpx.AsyncClient(
+            timeout=30
+        ) as client:
+            resp = await client.get(
+                "https://v1.basketball.api-sports.io/games",
+                headers={"x-apisports-key": API_KEY},
+                params={
+                    "league": "12",
+                    "season": "2024-2025",
+                    "date": today
+                }
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                games = data.get("response", [])
+                print(f"Basketball API: {len(games)} games")
+                supabase = get_supabase_admin()
+                for g in games:
+                    try:
+                        teams = g.get("teams", {})
+                        home = teams.get("home", {})
+                        away = teams.get("away", {})
+                        scores = g.get("scores", {})
+                        match = {
+                            "sport": "basketball",
+                            "league": g.get(
+                                "league", {}
+                            ).get("name", "NBA"),
+                            "home_team": home.get(
+                                "name", ""
+                            ),
+                            "away_team": away.get(
+                                "name", ""
+                            ),
+                            "match_date": g.get(
+                                "date", ""
+                            ),
+                            "status": "upcoming",
+                        }
+                        if match["home_team"]:
+                            supabase.table(
+                                "matches"
+                            ).insert(match).execute()
+                            count += 1
+                    except:
+                        continue
+                total += count
+                print(f"Basketball inserted: {count}")
     except Exception as e:
-        print(f"Basketball error: {e}")
-        
-    print(f"Total fixtures fetched: {total}")
+        print(f"Basketball fetch error: {e}")
+
+    print(f"Total fixtures: {total}")
     return total
 
 async def create_upcoming_fixtures_from_history():
