@@ -1,4 +1,5 @@
 import os
+import math
 import joblib
 import io
 import asyncio
@@ -232,6 +233,183 @@ def predict_match(
         "home_win_rate": round(home_wr, 3),
         "away_win_rate": round(away_wr, 3),
     }
+
+
+def get_scoring_stats(supabase, home_team, away_team, sport) -> dict:
+    try:
+        result = supabase.table("matches")\
+            .select("home_score, away_score, home_corners, away_corners")\
+            .eq("sport", sport)\
+            .eq("status", "completed")\
+            .not_.is_("home_score", "null")\
+            .not_.is_("away_score", "null")\
+            .or_(
+                f"home_team.eq.{home_team},away_team.eq.{home_team},"
+                f"home_team.eq.{away_team},away_team.eq.{away_team}"
+            )\
+            .limit(50)\
+            .execute()
+        
+        matches = result.data or []
+        if not matches:
+            return {
+                "avg_goals": 2.5, "btts_rate": 0.52,
+                "over25_rate": 0.54, "avg_corners": 10.2
+            }
+
+        total_goals = []
+        total_corners = []
+        btts_count = 0
+
+        for m in matches:
+            hs = m.get("home_score") or 0
+            aws = m.get("away_score") or 0
+            hc = m.get("home_corners") or 0
+            ac = m.get("away_corners") or 0
+            goals = hs + aws
+            corners = hc + ac
+            total_goals.append(goals)
+            if corners > 0:
+                total_corners.append(corners)
+            if hs > 0 and aws > 0:
+                btts_count += 1
+
+        avg_goals = sum(total_goals) / len(total_goals)
+        avg_corners = (
+            sum(total_corners) / len(total_corners)
+            if total_corners else 10.2
+        )
+        btts_rate = btts_count / len(matches)
+        over25_rate = sum(1 for g in total_goals if g > 2.5) / len(total_goals)
+
+        return {
+            "avg_goals": round(avg_goals, 2),
+            "btts_rate": round(btts_rate, 3),
+            "over25_rate": round(over25_rate, 3),
+            "avg_corners": round(avg_corners, 2)
+        }
+    except Exception:
+        return {
+            "avg_goals": 2.5, "btts_rate": 0.52,
+            "over25_rate": 0.54, "avg_corners": 10.2
+        }
+
+
+def predict_all_markets(
+    home_team, away_team, sport,
+    home_odds, away_odds, draw_odds,
+    supabase
+) -> list:
+    home_wr = get_team_form(supabase, home_team, sport)
+    away_wr = get_team_form(supabase, away_team, sport)
+    scoring = get_scoring_stats(supabase, home_team, away_team, sport)
+    avg_goals = scoring.get("avg_goals", 2.5)
+    btts_rate = scoring.get("btts_rate", 0.52)
+    avg_corners = scoring.get("avg_corners", 10.2)
+
+    # Generate realistic odds from win rates when API odds are null
+    if not home_odds or home_odds == 0:
+        raw = 1.0 / (home_wr * 1.05) if home_wr > 0 else 2.0
+        home_odds = round(max(1.15, min(raw, 4.00)), 2)
+    if not away_odds or away_odds == 0:
+        raw = 1.0 / (away_wr * 1.05) if away_wr > 0 else 2.0
+        away_odds = round(max(1.15, min(raw, 4.00)), 2)
+    if not draw_odds or draw_odds == 0:
+        draw_odds = 3.20
+
+    ho = float(home_odds)
+    ao = float(away_odds)
+    do = float(draw_odds)
+    draw_prob = max(0.01, 1 - home_wr - away_wr)
+
+    predictions = []
+
+    def make_pred(market, outcome, odds, prob):
+        ev = (prob * (odds - 1)) - (1 - prob)
+        return {
+            "market": market,
+            "outcome": outcome,
+            "odds": round(odds, 2),
+            "model_probability": round(prob, 4),
+            "implied_probability": round(1 / odds, 4),
+            "confidence": round(prob * 100, 1),
+            "ev": round(ev, 4),
+            "edge": round((prob - 1 / odds) * 100, 2),
+        }
+
+    def poisson_over(lam, k):
+        prob_under = sum(
+            (lam**i * math.exp(-lam)) / math.factorial(i)
+            for i in range(0, k + 1)
+        )
+        return max(0.01, min(0.99, 1 - prob_under))
+
+    def sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+
+    # --- Match Result ---
+    predictions.append(make_pred("Match Result", "Home Win", ho, home_wr))
+    predictions.append(make_pred("Match Result", "Away Win", ao, away_wr))
+    predictions.append(make_pred("Match Result", "Draw", do, draw_prob))
+
+    # --- Double Chance ---
+    hd_prob = min(0.97, home_wr + draw_prob)
+    hd_odds = max(1.10, min(round(1 / (hd_prob * 0.95), 2), 1.80))
+    predictions.append(make_pred("Double Chance", "Home/Draw", hd_odds, hd_prob))
+
+    ad_prob = min(0.97, away_wr + draw_prob)
+    ad_odds = max(1.10, min(round(1 / (ad_prob * 0.95), 2), 1.80))
+    predictions.append(make_pred("Double Chance", "Away/Draw", ad_odds, ad_prob))
+
+    # --- BTTS ---
+    btts_yes_odds = max(1.50, min(round(1 / (btts_rate * 0.95), 2), 2.20))
+    predictions.append(make_pred("BTTS", "Yes", btts_yes_odds, btts_rate))
+
+    btts_no_rate = 1 - btts_rate
+    btts_no_odds = max(1.50, min(round(1 / (btts_no_rate * 0.95), 2), 2.20))
+    predictions.append(make_pred("BTTS", "No", btts_no_odds, btts_no_rate))
+
+    # --- Goals Over/Under 1.5 ---
+    o15 = poisson_over(avg_goals, 1)
+    o15_odds = max(1.10, min(round(1 / (o15 * 0.95), 2), 2.00))
+    predictions.append(make_pred("Goals", "Over 1.5", o15_odds, o15))
+    u15 = 1 - o15
+    u15_odds = max(1.20, min(round(1 / (u15 * 0.95), 2), 2.50))
+    predictions.append(make_pred("Goals", "Under 1.5", u15_odds, u15))
+
+    # --- Goals Over/Under 2.5 ---
+    o25 = poisson_over(avg_goals, 2)
+    o25_odds = max(1.30, min(round(1 / (o25 * 0.95), 2), 2.50))
+    predictions.append(make_pred("Goals", "Over 2.5", o25_odds, o25))
+    u25 = 1 - o25
+    u25_odds = max(1.30, min(round(1 / (u25 * 0.95), 2), 2.50))
+    predictions.append(make_pred("Goals", "Under 2.5", u25_odds, u25))
+
+    # --- Goals Over/Under 3.5 ---
+    o35 = poisson_over(avg_goals, 3)
+    o35_odds = max(1.80, min(round(1 / (o35 * 0.95), 2), 5.00))
+    predictions.append(make_pred("Goals", "Over 3.5", o35_odds, o35))
+    u35 = 1 - o35
+    u35_odds = max(1.10, min(round(1 / (u35 * 0.95), 2), 1.60))
+    predictions.append(make_pred("Goals", "Under 3.5", u35_odds, u35))
+
+    # --- Corners Over/Under 8.5 ---
+    o85c = sigmoid((avg_corners - 8.5) * 0.4)
+    o85c_odds = max(1.40, min(round(1 / (o85c * 0.95), 2), 2.50))
+    predictions.append(make_pred("Corners", "Over 8.5", o85c_odds, o85c))
+    u85c = 1 - o85c
+    u85c_odds = max(1.40, min(round(1 / (u85c * 0.95), 2), 2.50))
+    predictions.append(make_pred("Corners", "Under 8.5", u85c_odds, u85c))
+
+    # --- Corners Over/Under 10.5 ---
+    o105c = sigmoid((avg_corners - 10.5) * 0.4)
+    o105c_odds = max(1.50, min(round(1 / (o105c * 0.95), 2), 3.50))
+    predictions.append(make_pred("Corners", "Over 10.5", o105c_odds, o105c))
+    u105c = 1 - o105c
+    u105c_odds = max(1.20, min(round(1 / (u105c * 0.95), 2), 2.00))
+    predictions.append(make_pred("Corners", "Under 10.5", u105c_odds, u105c))
+
+    return predictions
 
 
 def generate_reasoning(
