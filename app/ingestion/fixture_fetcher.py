@@ -241,12 +241,27 @@ async def fetch_football_with_odds():
 
 async def fetch_all_fixtures():
     print("Fetching real fixtures from API-Sports...")
+    total = 0
     
     # Football - primary sport
     count = await fetch_football_with_odds()
+    total += count
     print(f"Football fixtures: {count}")
     
-    total = count
+    # Basketball (NBA)
+    try:
+        count = await fetch_sport_fixtures(
+            "basketball",
+            "https://v1.basketball.api-sports.io/games",
+            {"league": "12", "season": "2024-2025",
+             "date": datetime.now().strftime("%Y-%m-%d")},
+            "map_basketball_fixture"
+        )
+        total += count
+        print(f"Basketball: {count}")
+    except Exception as e:
+        print(f"Basketball error: {e}")
+        
     print(f"Total fixtures fetched: {total}")
     return total
 
