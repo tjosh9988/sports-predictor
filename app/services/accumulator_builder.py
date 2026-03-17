@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Set, Dict, Any, Optional
 import google.generativeai as genai
 from app.database import get_supabase_admin
+from app.redis_client import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -440,96 +441,107 @@ async def build_all_accumulators():
     print("BUILD ACCUMULATORS STARTED")
     from datetime import datetime, timezone
     supabase = get_supabase_admin()
-    now = datetime.now(timezone.utc)
+    redis = get_redis()
+    
+    try:
+        now = datetime.now(timezone.utc)
 
-    result = supabase.table("matches")\
-        .select("*")\
-        .eq("status", "upcoming")\
-        .gte("match_date", now.isoformat())\
-        .order("match_date")\
-        .limit(300)\
-        .execute()
+        result = supabase.table("matches")\
+            .select("*")\
+            .eq("status", "upcoming")\
+            .gte("match_date", now.isoformat())\
+            .order("match_date")\
+            .limit(300)\
+            .execute()
 
-    fixtures = result.data or []
-    print(f"UPCOMING FIXTURES: {len(fixtures)}")
+        fixtures = result.data or []
+        print(f"UPCOMING FIXTURES: {len(fixtures)}")
 
-    if not fixtures:
-        print("No upcoming fixtures found")
-        return
+        if not fixtures:
+            print("No upcoming fixtures found")
+            return
 
-    all_predictions = []
+        all_predictions = []
 
-    for f in fixtures:
-        home = f.get("home_team", "")
-        away = f.get("away_team", "")
-        sport = f.get("sport", "football")
-        if not home or not away:
-            continue
-        try:
-            markets = predict_all_markets(
-                home, away, sport,
-                f.get("home_odds"),
-                f.get("away_odds"),
-                f.get("draw_odds"),
-                supabase
-            )
-            for market_pred in markets:
-                all_predictions.append({
-                    "fixture": f,
-                    "prediction": market_pred
-                })
-        except Exception as e:
-            print(f"Error {home} vs {away}: {e}")
-            continue
+        for f in fixtures:
+            home = f.get("home_team", "")
+            away = f.get("away_team", "")
+            sport = f.get("sport", "football")
+            if not home or not away:
+                continue
+            try:
+                markets = predict_all_markets(
+                    home, away, sport,
+                    f.get("home_odds"),
+                    f.get("away_odds"),
+                    f.get("draw_odds"),
+                    supabase
+                )
+                for market_pred in markets:
+                    all_predictions.append({
+                        "fixture": f,
+                        "prediction": market_pred
+                    })
+            except Exception as e:
+                print(f"Error {home} vs {away}: {e}")
+                continue
 
-    print(f"TOTAL MARKET PREDICTIONS: {len(all_predictions)}")
+        print(f"TOTAL MARKET PREDICTIONS: {len(all_predictions)}")
 
-    # Sort by EV descending
-    all_predictions.sort(
-        key=lambda x: x["prediction"]["ev"],
-        reverse=True
-    )
-
-    used_ids = set()
-    used_match_market = set()
-
-    configs = [
-        {
-            "type": "10odds",
-            "target": 10.0,
-            "max_legs": 12,
-            "min_legs": 7,
-            "min_conf": 52,
-            "max_single_odds": 1.50,
-            "min_single_odds": 1.10,
-        },
-        {
-            "type": "5odds",
-            "target": 5.0,
-            "max_legs": 10,
-            "min_legs": 7,
-            "min_conf": 55,
-            "max_single_odds": 1.35,
-            "min_single_odds": 1.10,
-        },
-        {
-            "type": "3odds",
-            "target": 3.0,
-            "max_legs": 7,
-            "min_legs": 5,
-            "min_conf": 60,
-            "max_single_odds": 1.25,
-            "min_single_odds": 1.10,
-        },
-    ]
-
-    for cfg in configs:
-        await save_accumulator(
-            supabase, all_predictions,
-            used_ids, used_match_market, cfg
+        # Sort by EV descending
+        all_predictions.sort(
+            key=lambda x: x["prediction"]["ev"],
+            reverse=True
         )
 
-    print("ALL ACCUMULATORS BUILT SUCCESSFULLY")
+        used_ids = set()
+        used_match_market = set()
+
+        configs = [
+            {
+                "type": "10odds",
+                "target": 10.0,
+                "max_legs": 12,
+                "min_legs": 7,
+                "min_conf": 52,
+                "max_single_odds": 1.50,
+                "min_single_odds": 1.10,
+            },
+            {
+                "type": "5odds",
+                "target": 5.0,
+                "max_legs": 10,
+                "min_legs": 7,
+                "min_conf": 55,
+                "max_single_odds": 1.35,
+                "min_single_odds": 1.10,
+            },
+            {
+                "type": "3odds",
+                "target": 3.0,
+                "max_legs": 7,
+                "min_legs": 5,
+                "min_conf": 60,
+                "max_single_odds": 1.25,
+                "min_single_odds": 1.10,
+            },
+        ]
+
+        for cfg in configs:
+            await save_accumulator(
+                supabase, all_predictions,
+                used_ids, used_match_market, cfg
+            )
+
+        print("ALL ACCUMULATORS BUILT SUCCESSFULLY")
+    except Exception as e:
+        print(f"BUILD ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Always clear the generation flag
+        redis.delete("acca_generation_in_progress")
+        print("Cleared acca_generation_in_progress flag")
 
 
 async def save_accumulator(
